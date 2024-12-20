@@ -15,7 +15,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-
 class TableCloner:
     def __init__(self, jira_story, databricks_path):
         self.jira_story = jira_story
@@ -35,11 +34,8 @@ class TableCloner:
         s3_client = boto3.client("s3")
         try:
             yaml_df = self.spark.read.text(f"{self.s3_bucket}{self.config_file}")
-            config_content = "\n".join(
-                [row.value for row in yaml_df.collect()]
-            )
+            config_content = "\n".join([row.value for row in yaml_df.collect()])
             return yaml.safe_load(config_content)
-
         except s3_client.exceptions.NoSuchKey:
             logger.error(f"Error retrieving S3 file: {self.config_file}")
             return None
@@ -55,9 +51,7 @@ class TableCloner:
         Clones a source table to a target table using the specified method.
         """
         table_name = table["table"]
-        copy_method = next(
-            (opt["value"] for opt in options if opt["key"] == "copy_method"), None
-        )
+        copy_method = next((opt["value"] for opt in options if opt["key"] == "copy_method"), None)
         source_table = f"{self.jira_story}.{table_name}"
         target_table = f"{self.jira_story}_{table_name}"
 
@@ -65,20 +59,15 @@ class TableCloner:
             if copy_method == "Deep clone":
                 clone_command = f"CREATE OR REPLACE TABLE {target_table} DEEP CLONE {source_table}"
                 logger.info(f"Clone command for Deep Clone is: {clone_command}")
-
             elif copy_method == "select_into":
-                filter_condition = next(
-                    (opt["value"] for opt in options if opt["key"] == "filter_condition"), "1=1"
-                )
+                filter_condition = next((opt["value"] for opt in options if opt["key"] == "filter_condition"), "1=1")
                 clone_command = f"CREATE OR REPLACE TABLE {target_table} AS SELECT * FROM {source_table} WHERE {filter_condition}"
                 logger.info(f"Clone command for Select Into is: {clone_command}")
-
             else:
                 raise ValueError(f"Unsupported copy method: {copy_method}")
 
             self.spark.sql(clone_command)
             logger.info(f"Table {source_table} cloned to {target_table} using {copy_method}")
-
         except Exception as e:
             logger.error(f"Error cloning table {table_name}: {e}")
 
@@ -92,7 +81,6 @@ class TableCloner:
         for table in self.config.get("tables", []):
             options = table["options"]
             self.clone_table(table, options)
-
 
 if __name__ == "__main__":
     jira_story = "sparta-4"
