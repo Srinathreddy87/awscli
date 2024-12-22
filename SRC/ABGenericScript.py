@@ -1,7 +1,6 @@
 """
-This module contains the ABTestDeltaTables class which is used to perform A/B testing
-on Delta tables in Databricks. It includes functionalities for schema comparison
-and row-by-row data validation.
+This script creates temporary tables with 100 rows from the main table and the cloned table.
+It ensures the manifest files are the same and refreshes the cloned table if necessary.
 """
 
 import logging
@@ -19,71 +18,83 @@ logging.basicConfig(
 )
 
 
-class ABTestDeltaTables:
+class TempTableCreator:
     """
-    A class to perform A/B testing on Delta tables in Databricks.
+    A class to create temporary tables with 100 rows from the main and cloned tables.
     """
 
-    def __init__(self, table_a, table_b, result_table):
+    def __init__(self, main_table, cloned_table, key_column):
         """
-        Initialize the A/B test with Delta table names.
+        Initialize with the main table, cloned table names, and key column.
 
-        :param table_a: Name of the first Delta table (A variant)
-        :param table_b: Name of the second Delta table (B variant)
-        :param result_table: Name of the result Delta table to store comparison results
+        :param main_table: Name of the main Delta table
+        :param cloned_table: Name of the cloned Delta table
+        :param key_column: The key column used for selecting rows
         """
-        self.spark = SparkSession.builder.appName("ABTestDeltaTables").getOrCreate()
-        self.table_a = table_a
-        self.table_b = table_b
-        self.result_table = result_table
+        self.spark = SparkSession.builder.appName("TempTableCreator").getOrCreate()
+        self.main_table = main_table
+        self.cloned_table = cloned_table
+        self.key_column = key_column
 
-    def compare_schemas(self):
+    def get_manifest_file(self, table):
         """
-        Compare the schemas of the two Delta tables.
+        Get the manifest file path of the Delta table.
+
+        :param table: The Delta table name
+        :return: The manifest file path
         """
-        schema_a = self.spark.read.format("delta").table(self.table_a).schema
-        schema_b = self.spark.read.format("delta").table(self.table_b).schema
+        delta_table = DeltaTable.forName(self.spark, table)
+        return delta_table.history().select("operationMetrics").collect()[0].asDict()[
+            "operationMetrics"
+        ]["write.path"]
 
-        diff = set(schema_a) ^ set(schema_b)
-        if not diff:
-            logger.info("Schemas are identical.")
-        else:
-            logger.info("Schemas differ: %s", diff)
-
-    def validate_data(self):
+    def refresh_clone_if_needed(self):
         """
-        Validate data row-by-row and store results in the result Delta table.
+        Compare manifest files of the main and cloned tables and refresh the clone if needed.
         """
-        df_a = self.spark.read.format("delta").table(self.table_a).withColumnRenamed(
-            "column1", "column1_a"
-        )
-        df_b = self.spark.read.format("delta").table(self.table_b).withColumnRenamed(
-            "column1", "column1_b"
-        )
+        main_manifest = self.get_manifest_file(self.main_table)
+        cloned_manifest = self.get_manifest_file(self.cloned_table)
 
-        joined_df = df_a.join(df_b, df_a["id"] == df_b["id"], "outer").select(
-            df_a["*"], df_b["*"]
-        )
+        if main_manifest != cloned_manifest:
+            logger.info("Manifest files differ. Refreshing the cloned table...")
+            self.spark.sql(f"REFRESH TABLE {self.cloned_table}")
+            logger.info("Cloned table refreshed.")
 
-        joined_df.createOrReplaceTempView("joined_view")
-        result_df = self.spark.sql(
-            """
-            SELECT *, 
-            CASE 
-                WHEN column1_a IS NOT NULL AND column1_b IS NOT NULL AND column1_a = column1_b THEN 'match'
-                ELSE 'mismatch'
-            END AS validation_result
-            FROM joined_view
-            """
-        )
+    def create_temp_tables(self):
+        """
+        Create temporary tables with 100 rows from both the main and cloned tables.
+        """
+        self.refresh_clone_if_needed()
 
-        result_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
-        logger.info(
-            "Data validation complete. Results stored in table: %s", self.result_table
-        )
+        # Load main table
+        df_main = self.spark.read.format("delta").table(self.main_table)
+        # Load cloned table
+        df_cloned = self.spark.read.format("delta").table(self.cloned_table)
+
+        # Select 100 random rows from each table
+        df_main_sample = df_main.orderBy(self.key_column).limit(100)
+        df_cloned_sample = df_cloned.orderBy(self.key_column).limit(100)
+
+        # Create temporary views
+        df_main_sample.createOrReplaceTempView("main_temp_table")
+        df_cloned_sample.createOrReplaceTempView("cloned_temp_table")
+
+        logger.info("Temporary tables created: main_temp_table, cloned_temp_table")
+
+    def show_temp_tables(self):
+        """
+        Show the first few rows of the temporary tables for verification.
+        """
+        self.spark.sql("SELECT * FROM main_temp_table").show()
+        self.spark.sql("SELECT * FROM cloned_temp_table").show()
 
 
 if __name__ == "__main__":
-    ab_test = ABTestDeltaTables("table_a", "table_b", "result_table")
-    ab_test.compare_schemas()
-    ab_test.validate_data()
+    # Replace with your actual table names and key column
+    main_table_name = "{{main_table}}"
+    cloned_table_name = "{{cloned_table}}"
+    key_column_name = "{{key_column}}"
+
+    temp_table_creator = TempTableCreator(main_table_name, cloned_table_name, key_column_name)
+    temp_table_creator.create_temp_tables()
+    temp_table_creator.show_temp_tables()
