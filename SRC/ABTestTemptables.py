@@ -1,18 +1,22 @@
 """
-This script creates temporary tables with 100 rows from the main table and the cloned table.
+This script creates temporary tables with 100 rows from the main table and the cloned
+table.
 
 It ensures the manifest files are the same and refreshes the cloned table if necessary.
 
 Classes:
     - TableCompareOptions: Dataclass for table compare options.
     - TableCompareConfig: Dataclass for table compare configurations.
-    - TempTableCreator: A class to create temporary tables with 100 rows from the main and cloned tables.
+    - TempTableCreator: A class to create temporary tables with 100 rows from the main
+      and cloned tables.
 
 Functions:
     - __init__: Initialize with the table compare configuration.
     - get_manifest_file: Get the manifest file path of the Delta table.
-    - refresh_clone_if_needed: Compare manifest files of the main and cloned tables and refresh the clone if needed.
-    - create_temp_tables: Create temporary tables with 100 rows from both the main and cloned tables.
+    - refresh_clone_if_needed: Compare manifest files of the main and cloned tables and
+      refresh the clone if needed.
+    - create_temp_tables: Create temporary tables with 100 rows from both the main and
+      cloned tables.
     - show_temp_tables: Show the first few rows of the temporary tables for verification.
 """
 
@@ -36,6 +40,13 @@ logging.basicConfig(
 class TableCompareOptions:
     """
     Dataclass for table compare options.
+
+    Attributes:
+        limit (int): The number of rows to sample from each table.
+        main_table_name (str): The name of the main Delta table.
+        cloned_table_name (str): The name of the cloned Delta table.
+        key_column_name (List[str]): The list of key column names used for ordering and
+          comparison.
     """
     limit: int
     main_table_name: str
@@ -46,6 +57,13 @@ class TableCompareOptions:
 class TableCompareConfig:
     """
     Dataclass for table compare configurations.
+
+    Attributes:
+        limit (int): The number of rows to sample from each table.
+        main_table_name (str): The name of the main Delta table.
+        cloned_table_name (str): The name of the cloned Delta table.
+        key_column_name (List[str]): The list of key column names used for ordering and
+          comparison.
     """
     limit: int
     main_table_name: str
@@ -81,7 +99,8 @@ class TempTableCreator:
 
     def refresh_clone_if_needed(self):
         """
-        Compare manifest files of the main and cloned tables and refresh the clone if needed.
+        Compare manifest files of the main and cloned tables and refresh the clone if
+        needed.
         """
         main_manifest = self.get_manifest_file(self.config.main_table_name)
         cloned_manifest = self.get_manifest_file(self.config.cloned_table_name)
@@ -103,8 +122,12 @@ class TempTableCreator:
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
 
         # Select 100 random rows from each table
-        df_main_sample = df_main.orderBy(self.config.key_column_name).limit(self.config.limit)
-        df_cloned_sample = df_cloned.orderBy(self.config.key_column_name).limit(self.config.limit)
+        df_main_sample = df_main.orderBy(self.config.key_column_name).limit(
+            self.config.limit
+        )
+        df_cloned_sample = df_cloned.orderBy(self.config.key_column_name).limit(
+            self.config.limit
+        )
 
         # Create temporary views
         df_main_sample.createOrReplaceTempView("main_temp_table")
@@ -126,7 +149,7 @@ if __name__ == "__main__":
         limit=100,
         main_table_name="main_table_name",
         cloned_table_name="cloned_table_name",
-        key_column_name=["key_column1", "key_column2"]
+        key_column_name=["key_column1", "key_column2"],
     )
 
     temp_table_creator = TempTableCreator(config)
