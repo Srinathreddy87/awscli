@@ -1,5 +1,6 @@
 """
 This script creates temporary tables with 100 rows from the main table and the cloned table.
+
 It ensures the manifest files are the same and refreshes the cloned table if necessary.
 """
 
@@ -27,9 +28,9 @@ class TempTableCreator:
         """
         Initialize with the main table, cloned table names, and key column.
 
-        :param main_table: Name of the main Delta table
-        :param cloned_table: Name of the cloned Delta table
-        :param key_column: The key column used for selecting rows
+        :param main_table: Name of the main Delta table.
+        :param cloned_table: Name of the cloned Delta table.
+        :param key_column: The key column used for selecting rows.
         """
         self.spark = SparkSession.builder.appName("TempTableCreator").getOrCreate()
         self.main_table = main_table
@@ -40,11 +41,13 @@ class TempTableCreator:
         """
         Get the manifest file path of the Delta table.
 
-        :param table: The Delta table name
-        :return: The manifest file path
+        :param table: The Delta table name.
+        :return: The manifest file path.
         """
         delta_table = DeltaTable.forName(self.spark, table)
-        return delta_table.history().select("operationMetrics").collect()[0].asDict()["operationMetrics"]["write.path"]
+        return delta_table.history().select("operationMetrics").collect()[0].asDict()[
+            "operationMetrics"
+        ]["write.path"]
 
     def refresh_clone_if_needed(self):
         """
@@ -63,7 +66,6 @@ class TempTableCreator:
         Create temporary tables with 100 rows from both the main and cloned tables.
         """
         self.refresh_clone_if_needed()
-
         # Load main table
         df_main = self.spark.read.format("delta").table(self.main_table)
         # Load cloned table
@@ -89,9 +91,9 @@ class TempTableCreator:
 
 if __name__ == "__main__":
     # Replace with your actual table names and key column
-    main_table_name = "main_table_name"
-    cloned_table_name = "cloned_table_name"
-    key_column_name = "key_column"
+    main_table_name = "{{main_table}}"
+    cloned_table_name = "{{cloned_table}}"
+    key_column_name = "{{key_column}}"
 
     temp_table_creator = TempTableCreator(main_table_name, cloned_table_name, key_column_name)
     temp_table_creator.create_temp_tables()
