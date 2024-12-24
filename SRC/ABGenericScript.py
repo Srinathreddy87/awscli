@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(name)s - %(levellevel)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
 
@@ -69,25 +69,34 @@ class ABTestDeltaTables:
         joined_df = df_a.join(df_b, join_condition, "outer").select(df_a["*"], df_b["*"])
         joined_df.createOrReplaceTempView("joined_view")
 
-        result_df = self.spark.sql(
-            """
-            SELECT *,
-            CASE
-                WHEN {} THEN 'match'
-                ELSE 'mismatch'
-            END AS validation_result
-            FROM joined_view
-            """.format(" AND ".join(
-                [
-                    f"{col}_a IS NOT NULL AND {col}_b IS NOT NULL "
-                    f"AND {col}_a = {col}_b" for col in self.key_columns
-                ]
-            ))
-        )
+        validation_query = self.construct_validation_query()
+        result_df = self.spark.sql(validation_query)
         result_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
         logger.info(
             "Data validation complete. Results stored in table: %s", self.result_table
         )
+
+    def construct_validation_query(self):
+        """
+        Construct the SQL query for data validation.
+
+        :return: SQL query string
+        """
+        validation_conditions = " AND ".join(
+            [
+                f"{col}_a IS NOT NULL AND {col}_b IS NOT NULL "
+                f"AND {col}_a = {col}_b" for col in self.key_columns
+            ]
+        )
+        query = f"""
+            SELECT *,
+            CASE
+                WHEN {validation_conditions} THEN 'match'
+                ELSE 'mismatch'
+            END AS validation_result
+            FROM joined_view
+        """
+        return query
 
 
 if __name__ == "__main__":
