@@ -7,35 +7,50 @@ and row-by-row data validation.
 import logging
 from pyspark.sql import SparkSession
 from delta.tables import DeltaTable
+from dataclasses import dataclass
+from typing import List
 
 # Set up a logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levellevel)s - %(message)s",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
+
+@dataclass
+class ABTestConfig:
+    """
+    Dataclass for A/B test configuration.
+
+    Attributes:
+        table_a (str): Name of the first Delta table (A variant).
+        table_b (str): Name of the second Delta table (B variant).
+        result_table (str): Name of the result Delta table to store comparison results.
+        key_columns (List[str]): List of key column names used for joining the tables.
+    """
+    table_a: str
+    table_b: str
+    result_table: str
+    key_columns: List[str]
 
 class ABTestDeltaTables:
     """
     A class to perform A/B testing on Delta tables in Databricks.
     """
 
-    def __init__(self, table_a, table_b, result_table, key_columns):
+    def __init__(self, config: ABTestConfig):
         """
         Initialize the A/B test with Delta table names.
 
-        :param table_a: Name of the first Delta table (A variant)
-        :param table_b: Name of the second Delta table (B variant)
-        :param result_table: Name of the result Delta table to store comparison results
-        :param key_columns: List of key column names used for joining the tables
+        :param config: An instance of ABTestConfig containing the configuration.
         """
         self.spark = spark  # Use the existing Spark session in Databricks
-        self.table_a = table_a
-        self.table_b = table_b
-        self.result_table = result_table
-        self.key_columns = key_columns
+        self.table_a = config.table_a
+        self.table_b = config.table_b
+        self.result_table = config.result_table
+        self.key_columns = config.key_columns
 
     def compare_schemas(self):
         """
@@ -100,11 +115,12 @@ class ABTestDeltaTables:
 
 
 if __name__ == "__main__":
-    ab_test = ABTestDeltaTables(
-        "table_a",
-        "table_b",
-        "result_table",
-        ["key_column1", "key_column2"]
+    config = ABTestConfig(
+        table_a="table_a",
+        table_b="table_b",
+        result_table="result_table",
+        key_columns=["key_column1", "key_column2"]
     )
+    ab_test = ABTestDeltaTables(config)
     ab_test.compare_schemas()
     ab_test.validate_data()
