@@ -1,3 +1,8 @@
+"""
+This module provides a function to set up a logger with a specified name.
+The logger is configured to output messages to the console with a standard format.
+"""
+
 import logging
 
 def setup_logger(name):
@@ -11,7 +16,7 @@ def setup_logger(name):
     logger.setLevel(logging.INFO)
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levellevel)s - %(message)s",
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[logging.StreamHandler()],
     )
     return logger
