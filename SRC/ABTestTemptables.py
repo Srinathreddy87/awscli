@@ -76,7 +76,7 @@ class TempTableCreator:
 
         # Select distinct keys from the main temporary table
         key_columns = self.config.key_column_name
-        key_columns_str = ", ".join([col for col in key_columns])
+        key_columns_str = ", ".join(key_columns)
         key_table_name = f"key_{self.config.main_table_name}"
         df_keys = self.spark.sql(f"""
             SELECT DISTINCT {key_columns_str}
@@ -102,9 +102,9 @@ class TempTableCreator:
         join_condition = " AND ".join([f"main.{col} = keys.{col}" for col in key_columns])
 
         # Perform the join and select all columns from the cloned table
-        df_cloned_filtered = df_cloned.alias("main").join(
-            self.spark.table(key_table_name).alias("keys"), join_condition, "inner"
-        ).select("main.*")
+        df_cloned_filtered = df_cloned.join(
+            df_keys, [df_cloned[col] == df_keys[col] for col in key_columns], "inner"
+        ).select(df_cloned["*"])
         
         # Debugging: Print schemas and sample data
         logger.info("Schema of main temporary table:")
@@ -184,7 +184,7 @@ class TempTableCreator:
         self.spark.sql(f"SELECT * FROM {cloned_temp_table} LIMIT 10").show()
 
 
-if __name__ == "__main__":
+if __name__ == "___MAIN__":
     # Example configuration
     config = TableCompareConfig(
         limit=100,
