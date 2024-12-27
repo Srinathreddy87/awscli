@@ -76,7 +76,7 @@ class TempTableCreator:
 
         # Select distinct keys from the main temporary table
         key_columns = self.config.key_column_name
-        key_columns_str = ", ".join([f"trim({col}) as {col}" for col in key_columns])
+        key_columns_str = ", ".join([col for col in key_columns])
         key_table_name = f"key_{self.config.main_table_name}"
         df_keys = self.spark.sql(f"""
             SELECT DISTINCT {key_columns_str}
