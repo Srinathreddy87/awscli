@@ -53,6 +53,7 @@ class TempTableCreator:
         df_main = self.spark.read.format("delta").table(self.config.main_table_name)
         main_temp_stg_table = f"{self.config.main_table_name}_temp_Stg"
         df_main.write.mode("overwrite").saveAsTable(main_temp_stg_table)
+        logger.info(f"Main temporary table '{main_temp_stg_table}' created")
 
         # Select distinct keys from the main temporary table
         key_columns = self.config.key_column_name
@@ -64,6 +65,7 @@ class TempTableCreator:
             LIMIT {self.config.limit}
         """)
         df_keys.write.mode("overwrite").saveAsTable(key_table_name)
+        logger.info(f"Keys temporary table '{key_table_name}' created")
 
         # Load cloned table
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
@@ -77,9 +79,29 @@ class TempTableCreator:
             self.spark.table(key_table_name).alias("keys"), join_condition, "inner"
         ).select("main.*")
         
+        # Debugging: Print schemas and sample data
+        logger.info("Schema of main temporary table:")
+        df_main.printSchema()
+        logger.info("Sample data from main temporary table:")
+        df_main.show(10)
+
+        logger.info("Schema of keys temporary table:")
+        df_keys.printSchema()
+        logger.info("Sample data from keys temporary table:")
+        df_keys.show(10)
+
+        logger.info("Schema of cloned table:")
+        df_cloned.printSchema()
+        logger.info("Sample data from cloned table:")
+        df_cloned.show(10)
+
+        logger.info("Schema of cloned filtered table:")
+        df_cloned_filtered.printSchema()
+        logger.info("Sample data from cloned filtered table:")
+        df_cloned_filtered.show(10)
+
         # Create a temporary table for the filtered cloned table
         df_cloned_filtered.write.mode("overwrite").saveAsTable(cloned_temp_stg_table)
-
         logger.info(f"Initial temporary tables created: {main_temp_stg_table}, {key_table_name}, {cloned_temp_stg_table}")
 
     def create_final_temp_tables(self):
