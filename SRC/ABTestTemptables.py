@@ -111,3 +111,16 @@ if __name__ == "__main__":
     temp_table_creator = TempTableCreator(config)
     temp_table_creator.create_temp_tables()
     temp_table_creator.show_temp_tables()
+
+
+
+# Explicit query for debugging
+    test_query = f"""
+        SELECT main.*
+        FROM cloned_table main
+        JOIN keys_temp_view keys
+        ON main.{key_columns[0]} = keys.{key_columns[0]}
+        LIMIT 10
+    """
+    logger.info("Executing test query:")
+    self.spark.sql(test_query).show()
