@@ -63,6 +63,10 @@ class TempTableCreator:
         """)
         df_keys.createOrReplaceTempView("keys_temp_view")
 
+        # Print distinct keys to verify
+        logger.info("Distinct keys selected from main_temp_view:")
+        df_keys.show()
+
         # Load cloned table
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
 
