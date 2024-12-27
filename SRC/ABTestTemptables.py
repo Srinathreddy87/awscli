@@ -222,3 +222,21 @@ if __name__ == "__main__":
     temp_table_creator.create_final_temp_tables()
     temp_table_creator.drop_initial_temp_tables()
     temp_table_creator.show_temp_tables()
+
+
+------------------------
+
+Hi Mahantesh and Vishal,
+
+I wanted to provide an update on the AB framework. Initially, we had targeted completion by 01/03/2025. However, due to a shortage of resources, progress has not been as expected. The new expected ETA is on or before 01/10/2025.
+
+As of now, I have created two scripts according to the client's requirements and completed initial testing.
+
+Pending Tasks:
+
+Format both scripts according to Black format and Python re-commit version 11.
+Enhance the scripts to add logic that validates the clone table and source table, ensuring both are in sync.
+Add logic to support scripting for curated tables.
+Create a common function to be used across projects.
+Develop a dashboard to display AB testing results.
+Considering all the tasks, I expect to complete them by 01/10/2025.
