@@ -86,9 +86,9 @@ if __name__ == "__main__":
     # Example configuration
     config = TableCompareConfig(
         limit=100,
-        main_table_name="main_table_name",
-        cloned_table_name="cloned_table_name",
-        key_column_name=["key_column1", "key_column2"]
+        main_table_name="en_poc_dev.sparta_work.user_data",
+        cloned_table_name="en_poc_dev.sparta_work.user_data_stage",
+        key_column_name=["clm_id"]
     )
 
     temp_table_creator = TempTableCreator(config)
