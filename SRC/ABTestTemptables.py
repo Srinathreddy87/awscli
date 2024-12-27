@@ -57,12 +57,13 @@ class TempTableCreator:
         # Select distinct keys from the main temporary table
         key_columns = self.config.key_column_name
         key_columns_str = ", ".join([f"trim({col}) as {col}" for col in key_columns])
+        key_table_name = f"key_{self.config.main_table_name}"
         df_keys = self.spark.sql(f"""
             SELECT DISTINCT {key_columns_str}
             FROM {main_temp_stg_table}
             LIMIT {self.config.limit}
         """)
-        df_keys.write.mode("overwrite").saveAsTable("keys_temp_Stg")
+        df_keys.write.mode("overwrite").saveAsTable(key_table_name)
 
         # Load cloned table
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
@@ -73,13 +74,13 @@ class TempTableCreator:
 
         # Perform the join and select all columns from the cloned table
         df_cloned_filtered = df_cloned.alias("main").join(
-            self.spark.table("keys_temp_Stg").alias("keys"), join_condition, "inner"
+            self.spark.table(key_table_name).alias("keys"), join_condition, "inner"
         ).select("main.*")
         
         # Create a temporary table for the filtered cloned table
         df_cloned_filtered.write.mode("overwrite").saveAsTable(cloned_temp_stg_table)
 
-        logger.info(f"Initial temporary tables created: {main_temp_stg_table}, keys_temp_Stg, {cloned_temp_stg_table}")
+        logger.info(f"Initial temporary tables created: {main_temp_stg_table}, {key_table_name}, {cloned_temp_stg_table}")
 
     def create_final_temp_tables(self):
         """
@@ -112,12 +113,13 @@ class TempTableCreator:
         """
         main_temp_stg_table = f"{self.config.main_table_name}_temp_Stg"
         cloned_temp_stg_table = f"{self.config.cloned_table_name}_temp_Stg"
+        key_table_name = f"key_{self.config.main_table_name}"
 
         self.spark.sql(f"DROP TABLE IF EXISTS {main_temp_stg_table}")
-        self.spark.sql(f"DROP TABLE IF EXISTS keys_temp_Stg")
+        self.spark.sql(f"DROP TABLE IF EXISTS {key_table_name}")
         self.spark.sql(f"DROP TABLE IF EXISTS {cloned_temp_stg_table}")
 
-        logger.info(f"Initial temporary tables dropped: {main_temp_stg_table}, keys_temp_Stg, {cloned_temp_stg_table}")
+        logger.info(f"Initial temporary tables dropped: {main_temp_stg_table}, {key_table_name}, {cloned_temp_stg_table}")
 
     def show_temp_tables(self):
         """
