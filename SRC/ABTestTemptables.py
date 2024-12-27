@@ -55,7 +55,7 @@ class TempTableCreator:
 
         # Select 100 distinct keys from the main temporary view
         key_columns = self.config.key_column_name
-        key_columns_str = ", ".join(key_columns)
+        key_columns_str = ", ".join([f"trim({col}) as {col}" for col in key_columns])
         df_keys = self.spark.sql(f"""
             SELECT DISTINCT {key_columns_str}
             FROM main_temp_view
@@ -63,15 +63,20 @@ class TempTableCreator:
         """)
         df_keys.createOrReplaceTempView("keys_temp_view")
 
-        # Print distinct keys to verify
-        logger.info("Distinct keys selected from main_temp_view:")
-        df_keys.show()
+        # Print schema to verify column names
+        logger.info("Schema of main_temp_view:")
+        df_main.printSchema()
+        
+        logger.info("Schema of keys_temp_view:")
+        df_keys.printSchema()
 
-        # Load cloned table
+        # Load cloned table and print schema
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
+        logger.info("Schema of cloned table:")
+        df_cloned.printSchema()
 
         # Generate the join condition
-        join_condition = " AND ".join([f"main.{col} = keys.{col}" for col in key_columns])
+        join_condition = " AND ".join([f"trim(main.{col}) = trim(keys.{col})" for col in key_columns])
 
         # Perform the join and select all columns from the cloned table
         df_cloned_filtered = df_cloned.alias("main").join(
