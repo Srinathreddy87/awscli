@@ -45,12 +45,22 @@ class TempTableCreator:
         self.config = config
         logger.info(f"Initialized with config: {self.config}")
 
+    def normalize_column_names(self, df):
+        """
+        Normalize column names by trimming whitespace.
+        """
+        for col in df.columns:
+            df = df.withColumnRenamed(col, col.strip())
+        return df
+
     def create_initial_temp_tables(self):
         """
         Create initial temporary tables with the postfix '_temp_Stg'.
         """
-        # Load main table and create a temporary table
+        # Load main table and normalize column names
         df_main = self.spark.read.format("delta").table(self.config.main_table_name)
+        df_main = self.normalize_column_names(df_main)
+        
         main_temp_stg_table = f"{self.config.main_table_name}_temp_Stg"
         df_main.write.mode("overwrite").saveAsTable(main_temp_stg_table)
         logger.info(f"Main temporary table '{main_temp_stg_table}' created")
@@ -67,8 +77,10 @@ class TempTableCreator:
         df_keys.write.mode("overwrite").saveAsTable(key_table_name)
         logger.info(f"Keys temporary table '{key_table_name}' created")
 
-        # Load cloned table
+        # Load cloned table and normalize column names
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
+        df_cloned = self.normalize_column_names(df_cloned)
+        
         cloned_temp_stg_table = f"{self.config.cloned_table_name}_temp_Stg"
         
         # Generate the join condition
