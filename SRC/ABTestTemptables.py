@@ -59,6 +59,26 @@ class TempTableCreator:
         """
         logger.info(f"Columns in {table_name}: {df.columns}")
 
+    def check_data_files_equal(self, table_a, table_b):
+        """
+        Check if the data files for two tables are equal.
+        """
+        df_a = self.spark.sql(f"DESCRIBE DETAIL {table_a}")
+        df_b = self.spark.sql(f"DESCRIBE DETAIL {table_b}")
+
+        files_a = df_a.select("partitionColumns", "numFiles", "sizeInBytes").collect()
+        files_b = df_b.select("partitionColumns", "numFiles", "sizeInBytes").collect()
+
+        return files_a == files_b
+
+    def recreate_cloned_table(self):
+        """
+        Recreate the cloned table.
+        """
+        self.spark.sql(f"DROP TABLE IF EXISTS {self.config.cloned_table_name}")
+        self.spark.sql(f"CREATE TABLE {self.config.cloned_table_name} AS SELECT * FROM {self.config.main_table_name}")
+        logger.info(f"Cloned table '{self.config.cloned_table_name}' recreated")
+
     def create_initial_temp_tables(self):
         """
         Create initial temporary tables with the postfix '_temp_Stg'.
@@ -99,12 +119,10 @@ class TempTableCreator:
         self.print_column_names(df_cloned, "cloned_temp_stg_table")
 
         # Generate the join condition
-        join_condition = " AND ".join([f"main.{col} = keys.{col}" for col in key_columns])
+        join_condition = [df_cloned[col] == df_keys[col] for col in key_columns]
 
         # Perform the join and select all columns from the cloned table
-        df_cloned_filtered = df_cloned.join(
-            df_keys, [df_cloned[col] == df_keys[col] for col in key_columns], "inner"
-        ).select(df_cloned["*"])
+        df_cloned_filtered = df_cloned.join(df_keys, join_condition, "inner").select(df_cloned["*"])
         
         # Debugging: Print schemas and sample data
         logger.info("Schema of main temporary table:")
@@ -184,7 +202,7 @@ class TempTableCreator:
         self.spark.sql(f"SELECT * FROM {cloned_temp_table} LIMIT 10").show()
 
 
-if __name__ == "___MAIN__":
+if __name__ == "__main__":
     # Example configuration
     config = TableCompareConfig(
         limit=100,
@@ -194,6 +212,12 @@ if __name__ == "___MAIN__":
     )
 
     temp_table_creator = TempTableCreator(config)
+
+    # Check if data files are equal and recreate the cloned table if not
+    if not temp_table_creator.check_data_files_equal(config.main_table_name, config.cloned_table_name):
+        temp_table_creator.recreate_cloned_table()
+
+    # Create initial, final temp tables and show the result
     temp_table_creator.create_initial_temp_tables()
     temp_table_creator.create_final_temp_tables()
     temp_table_creator.drop_initial_temp_tables()
