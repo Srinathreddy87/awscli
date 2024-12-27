@@ -1,28 +1,5 @@
-"""
-This script creates temporary tables with 100 rows from the main table and the cloned
-table.
-
-It ensures the manifest files are the same and refreshes the cloned table if necessary.
-
-Classes:
-    - TableCompareOptions: Dataclass for table compare options.
-    - TableCompareConfig: Dataclass for table compare configurations.
-    - TempTableCreator: A class to create temporary tables with 100 rows from the main
-      and cloned tables.
-
-Functions:
-    - __init__: Initialize with the table compare configuration.
-    - get_manifest_file: Get the manifest file path of the Delta table.
-    - refresh_clone_if_needed: Compare manifest files of the main and cloned tables and
-      refresh the clone if needed.
-    - create_temp_tables: Create temporary tables with 100 rows from both the main and
-      cloned tables.
-    - show_temp_tables: Show the first few rows of the temporary tables for verification.
-"""
-
 import logging
 from pyspark.sql import SparkSession
-from delta.tables import DeltaTable
 from dataclasses import dataclass
 from typing import List
 
@@ -37,23 +14,6 @@ logging.basicConfig(
 )
 
 @dataclass
-class TableCompareOptions:
-    """
-    Dataclass for table compare options.
-
-    Attributes:
-        limit (int): The number of rows to sample from each table.
-        main_table_name (str): The name of the main Delta table.
-        cloned_table_name (str): The name of the cloned Delta table.
-        key_column_name (List[str]): The list of key column names used for ordering and
-          comparison.
-    """
-    limit: int
-    main_table_name: str
-    cloned_table_name: str
-    key_column_name: List[str]
-
-@dataclass
 class TableCompareConfig:
     """
     Dataclass for table compare configurations.
@@ -62,18 +22,21 @@ class TableCompareConfig:
         limit (int): The number of rows to sample from each table.
         main_table_name (str): The name of the main Delta table.
         cloned_table_name (str): The name of the cloned Delta table.
-        key_column_name (List[str]): The list of key column names used for ordering and
-          comparison.
+        key_column_name (List[str]): The list of key column names used for ordering and comparison.
+        catalog_name (str): The name of the Unity Catalog.
+        schema_name (str): The name of the schema in the Unity Catalog.
     """
     limit: int
     main_table_name: str
     cloned_table_name: str
     key_column_name: List[str]
+    catalog_name: str
+    schema_name: str
 
 
 class TempTableCreator:
     """
-    A class to create temporary tables with 100 rows from the main and cloned tables.
+    A class to create temporary tables with 100 matched rows from the main and cloned tables.
     """
 
     def __init__(self, config: TableCompareConfig):
@@ -84,63 +47,55 @@ class TempTableCreator:
         """
         self.spark = SparkSession.builder.appName("TempTableCreator").getOrCreate()
         self.config = config
-
-    def get_manifest_file(self, table):
-        """
-        Get the manifest file path of the Delta table.
-
-        :param table: The Delta table name.
-        :return: The manifest file path.
-        """
-        delta_table = DeltaTable.forName(self.spark, table)
-        return delta_table.history().select("operationMetrics").collect()[0].asDict()[
-            "operationMetrics"
-        ]["write.path"]
+        logger.info(f"Initialized with config: {self.config}")
 
     def refresh_clone_if_needed(self):
         """
-        Compare manifest files of the main and cloned tables and refresh the clone if
-        needed.
+        Refresh the cloned table if needed. Placeholder for actual implementation.
         """
-        main_manifest = self.get_manifest_file(self.config.main_table_name)
-        cloned_manifest = self.get_manifest_file(self.config.cloned_table_name)
-
-        if main_manifest != cloned_manifest:
-            logger.info("Manifest files differ. Refreshing the cloned table...")
-            self.spark.sql(f"REFRESH TABLE {self.config.cloned_table_name}")
-            logger.info("Cloned table refreshed.")
+        pass
 
     def create_temp_tables(self):
         """
-        Create temporary tables with 100 rows from both the main and cloned tables.
+        Create temporary tables with 100 matched rows from both the main and cloned tables.
         """
         self.refresh_clone_if_needed()
 
-        # Load main table
+        # Load main table and create a temporary view
         df_main = self.spark.read.format("delta").table(self.config.main_table_name)
-        # Load cloned table
+        main_temp_view = f"{self.config.catalog_name}.{self.config.schema_name}.{self.config.main_table_name}_temp"
+        df_main.createOrReplaceTempView(main_temp_view)
+
+        # Select 100 distinct keys from the main temporary view
+        key_columns = self.config.key_column_name
+        df_keys = self.spark.sql(f"""
+            SELECT DISTINCT {', '.join(key_columns)}
+            FROM {main_temp_view}
+            LIMIT {self.config.limit}
+        """)
+        df_keys.createOrReplaceTempView("keys_temp_view")
+
+        # Load cloned table and filter based on selected keys to create another temporary view
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
+        cloned_temp_view = f"{self.config.catalog_name}.{self.config.schema_name}.{self.config.cloned_table_name}_temp"
+        join_condition = " AND ".join([f"main.{col} = keys.{col}" for col in key_columns])
+        df_cloned_filtered = df_cloned.alias("main").join(df_keys.alias("keys"), join_condition, "inner")
+        df_cloned_filtered.createOrReplaceTempView(cloned_temp_view)
 
-        # Select 100 random rows from each table
-        df_main_sample = df_main.orderBy(self.config.key_column_name).limit(
-            self.config.limit
-        )
-        df_cloned_sample = df_cloned.orderBy(self.config.key_column_name).limit(
-            self.config.limit
-        )
-
-        # Create temporary views
-        df_main_sample.createOrReplaceTempView("main_temp_table")
-        df_cloned_sample.createOrReplaceTempView("cloned_temp_table")
-
-        logger.info("Temporary tables created: main_temp_table, cloned_temp_table")
+        logger.info(f"Temporary tables created: {main_temp_view}, {cloned_temp_view}")
 
     def show_temp_tables(self):
         """
         Show the first few rows of the temporary tables for verification.
         """
-        self.spark.sql("SELECT * FROM main_temp_table").show()
-        self.spark.sql("SELECT * FROM cloned_temp_table").show()
+        main_temp_view = f"{self.config.catalog_name}.{self.config.schema_name}.{self.config.main_table_name}_temp"
+        cloned_temp_view = f"{self.config.catalog_name}.{self.config.schema_name}.{self.config.cloned_table_name}_temp"
+
+        logger.info(f"First few rows of {main_temp_view}:")
+        self.spark.sql(f"SELECT * FROM {main_temp_view} LIMIT 10").show()
+
+        logger.info(f"First few rows of {cloned_temp_view}:")
+        self.spark.sql(f"SELECT * FROM {cloned_temp_view} LIMIT 10").show()
 
 
 if __name__ == "__main__":
@@ -150,6 +105,8 @@ if __name__ == "__main__":
         main_table_name="main_table_name",
         cloned_table_name="cloned_table_name",
         key_column_name=["key_column1", "key_column2"],
+        catalog_name="your_catalog_name",  # Specify your Unity Catalog name
+        schema_name="your_schema_name"    # Specify your Unity Schema name
     )
 
     temp_table_creator = TempTableCreator(config)
