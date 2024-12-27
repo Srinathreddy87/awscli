@@ -45,58 +45,78 @@ class TempTableCreator:
         self.config = config
         logger.info(f"Initialized with config: {self.config}")
 
-    def create_temp_tables(self):
+    def create_initial_temp_tables(self):
         """
-        Create temporary tables with 100 matched rows from both the main and cloned tables.
+        Create initial temporary tables with the postfix '_temp_Stg'.
         """
         # Load main table and create a temporary view
         df_main = self.spark.read.format("delta").table(self.config.main_table_name)
-        df_main.createOrReplaceTempView("main_temp_view")
+        df_main.createOrReplaceTempView(f"{self.config.main_table_name}_temp_Stg")
 
-        # Select 100 distinct keys from the main temporary view
+        # Select distinct keys from the main temporary view
         key_columns = self.config.key_column_name
         key_columns_str = ", ".join([f"trim({col}) as {col}" for col in key_columns])
         df_keys = self.spark.sql(f"""
             SELECT DISTINCT {key_columns_str}
-            FROM main_temp_view
+            FROM {self.config.main_table_name}_temp_Stg
             LIMIT {self.config.limit}
         """)
-        df_keys.createOrReplaceTempView("keys_temp_view")
+        df_keys.createOrReplaceTempView("keys_temp_Stg")
 
-        # Print schema to verify column names
-        logger.info("Schema of main_temp_view:")
-        df_main.printSchema()
-        
-        logger.info("Schema of keys_temp_view:")
-        df_keys.printSchema()
-
-        # Load cloned table and print schema
+        # Load cloned table
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
-        logger.info("Schema of cloned table:")
-        df_cloned.printSchema()
-
         # Generate the join condition
         join_condition = " AND ".join([f"trim(main.{col}) = trim(keys.{col})" for col in key_columns])
 
         # Perform the join and select all columns from the cloned table
         df_cloned_filtered = df_cloned.alias("main").join(
-            self.spark.table("keys_temp_view").alias("keys"), join_condition, "inner"
+            self.spark.table("keys_temp_Stg").alias("keys"), join_condition, "inner"
         ).select("main.*")
         
         # Create a temporary view for the filtered cloned table
-        df_cloned_filtered.createOrReplaceTempView("cloned_temp_view")
+        df_cloned_filtered.createOrReplaceTempView(f"{self.config.cloned_table_name}_temp_Stg")
 
-        logger.info("Temporary tables created: main_temp_view, cloned_temp_view")
+        logger.info(f"Initial temporary tables created: {self.config.main_table_name}_temp_Stg, keys_temp_Stg, {self.config.cloned_table_name}_temp_Stg")
+
+    def create_final_temp_tables(self):
+        """
+        Create final temporary tables with the postfix '_temp' from the initial temporary tables.
+        """
+        # Create final temporary view for the main table
+        self.spark.sql(f"""
+            CREATE OR REPLACE TEMP VIEW {self.config.main_table_name}_temp AS
+            SELECT * FROM {self.config.main_table_name}_temp_Stg
+            LIMIT {self.config.limit}
+        """)
+
+        # Create final temporary view for the cloned table
+        self.spark.sql(f"""
+            CREATE OR REPLACE TEMP VIEW {self.config.cloned_table_name}_temp AS
+            SELECT * FROM {self.config.cloned_table_name}_temp_Stg
+            LIMIT {self.config.limit}
+        """)
+
+        logger.info(f"Final temporary tables created: {self.config.main_table_name}_temp, {self.config.cloned_table_name}_temp")
+
+    def drop_initial_temp_tables(self):
+        """
+        Drop the initial temporary tables with the postfix '_temp_Stg'.
+        """
+        self.spark.catalog.dropTempView(f"{self.config.main_table_name}_temp_Stg")
+        self.spark.catalog.dropTempView("keys_temp_Stg")
+        self.spark.catalog.dropTempView(f"{self.config.cloned_table_name}_temp_Stg")
+
+        logger.info(f"Initial temporary tables dropped: {self.config.main_table_name}_temp_Stg, keys_temp_Stg, {self.config.cloned_table_name}_temp_Stg")
 
     def show_temp_tables(self):
         """
-        Show the first few rows of the temporary tables for verification.
+        Show the first few rows of the final temporary tables for verification.
         """
-        logger.info("First few rows of main_temp_view:")
-        self.spark.sql("SELECT * FROM main_temp_view LIMIT 10").show()
+        logger.info(f"First few rows of {self.config.main_table_name}_temp:")
+        self.spark.sql(f"SELECT * FROM {self.config.main_table_name}_temp LIMIT 10").show()
 
-        logger.info("First few rows of cloned_temp_view:")
-        self.spark.sql("SELECT * FROM cloned_temp_view LIMIT 10").show()
+        logger.info(f"First few rows of {self.config.cloned_table_name}_temp:")
+        self.spark.sql(f"SELECT * FROM {self.config.cloned_table_name}_temp LIMIT 10").show()
 
 
 if __name__ == "__main__":
@@ -109,18 +129,7 @@ if __name__ == "__main__":
     )
 
     temp_table_creator = TempTableCreator(config)
-    temp_table_creator.create_temp_tables()
+    temp_table_creator.create_initial_temp_tables()
+    temp_table_creator.create_final_temp_tables()
+    temp_table_creator.drop_initial_temp_tables()
     temp_table_creator.show_temp_tables()
-
-
-
-# Explicit query for debugging
-    test_query = f"""
-        SELECT main.*
-        FROM cloned_table main
-        JOIN keys_temp_view keys
-        ON main.{key_columns[0]} = keys.{key_columns[0]}
-        LIMIT 10
-    """
-    logger.info("Executing test query:")
-    self.spark.sql(test_query).show()
