@@ -63,10 +63,18 @@ class TempTableCreator:
         """)
         df_keys.createOrReplaceTempView("keys_temp_view")
 
-        # Load cloned table and filter based on selected keys to create another temporary view
+        # Load cloned table
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
+
+        # Generate the join condition
         join_condition = " AND ".join([f"main.{col} = keys.{col}" for col in key_columns])
-        df_cloned_filtered = df_cloned.alias("main").join(self.spark.table("keys_temp_view").alias("keys"), join_condition, "inner")
+
+        # Perform the join and select all columns from the cloned table
+        df_cloned_filtered = df_cloned.alias("main").join(
+            self.spark.table("keys_temp_view").alias("keys"), join_condition, "inner"
+        ).select("main.*")
+        
+        # Create a temporary view for the filtered cloned table
         df_cloned_filtered.createOrReplaceTempView("cloned_temp_view")
 
         logger.info("Temporary tables created: main_temp_view, cloned_temp_view")
