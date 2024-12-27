@@ -53,6 +53,12 @@ class TempTableCreator:
             df = df.withColumnRenamed(col, col.strip())
         return df
 
+    def print_column_names(self, df, table_name):
+        """
+        Print the column names of a DataFrame.
+        """
+        logger.info(f"Columns in {table_name}: {df.columns}")
+
     def create_initial_temp_tables(self):
         """
         Create initial temporary tables with the postfix '_temp_Stg'.
@@ -64,6 +70,9 @@ class TempTableCreator:
         main_temp_stg_table = f"{self.config.main_table_name}_temp_Stg"
         df_main.write.mode("overwrite").saveAsTable(main_temp_stg_table)
         logger.info(f"Main temporary table '{main_temp_stg_table}' created")
+
+        # Print column names for debugging
+        self.print_column_names(df_main, "main_temp_stg_table")
 
         # Select distinct keys from the main temporary table
         key_columns = self.config.key_column_name
@@ -77,14 +86,20 @@ class TempTableCreator:
         df_keys.write.mode("overwrite").saveAsTable(key_table_name)
         logger.info(f"Keys temporary table '{key_table_name}' created")
 
+        # Print column names for debugging
+        self.print_column_names(df_keys, "key_table_name")
+
         # Load cloned table and normalize column names
         df_cloned = self.spark.read.format("delta").table(self.config.cloned_table_name)
         df_cloned = self.normalize_column_names(df_cloned)
         
         cloned_temp_stg_table = f"{self.config.cloned_table_name}_temp_Stg"
         
+        # Print column names for debugging
+        self.print_column_names(df_cloned, "cloned_temp_stg_table")
+
         # Generate the join condition
-        join_condition = " AND ".join([f"trim(main.{col}) = trim(keys.{col})" for col in key_columns])
+        join_condition = " AND ".join([f"main.{col} = keys.{col}" for col in key_columns])
 
         # Perform the join and select all columns from the cloned table
         df_cloned_filtered = df_cloned.alias("main").join(
