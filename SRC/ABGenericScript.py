@@ -5,9 +5,9 @@ and row-by-row data validation.
 """
 
 import logging
-from pyspark.sql import SparkSession
 from dataclasses import dataclass
 from typing import List
+from pyspark.sql import SparkSession
 
 # Set up a logger
 logger = logging.getLogger(__name__)
