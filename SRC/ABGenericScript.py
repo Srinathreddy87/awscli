@@ -119,13 +119,13 @@ class ABTestDeltaTables:
 
 
 if __name__ == "__main__":
-    config = ABTestConfig(
+    ab_test_config = ABTestConfig(
         table_a="table_a",
         table_b="table_b",
         result_table="result_table",
         key_columns=["key_column1", "key_column2"]
     )
-    ab_test = ABTestDeltaTables(config)
+    ab_test = ABTestDeltaTables(ab_test_config)
 
     # Compare schemas and validate data
     ab_test.compare_schemas()
