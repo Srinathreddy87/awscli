@@ -64,6 +64,26 @@ class ABTestDeltaTables:
         else:
             logger.info("Schemas differ: %s", diff)
 
+    def check_data_files_equal(self, table_a, table_b):
+        """
+        Check if the data files for two tables are equal.
+        """
+        df_a = self.spark.sql(f"DESCRIBE DETAIL {table_a}").select("numFiles", "sizeInBytes").collect()
+        df_b = self.spark.sql(f"DESCRIBE DETAIL {table_b}").select("numFiles", "sizeInBytes").collect()
+
+        if len(df_a) == 0 or len(df_b) == 0:
+            return False
+
+        return df_a[0] == df_b[0]
+
+    def recreate_cloned_table(self):
+        """
+        Recreate the cloned table from the main table.
+        """
+        self.spark.sql(f"DROP TABLE IF EXISTS {self.table_b}")
+        self.spark.sql(f"CREATE TABLE {self.table_b} AS SELECT * FROM {self.table_a}")
+        logger.info(f"Cloned table '{self.table_b}' recreated")
+
     def validate_data(self):
         """
         Validate data row-by-row and store results in the result Delta table.
@@ -85,32 +105,32 @@ class ABTestDeltaTables:
         joined_df = df_a.join(df_b, join_condition, "outer").select(df_a["*"], df_b["*"])
         joined_df.createOrReplaceTempView("joined_view")
 
-        validation_query = self.construct_validation_query()
-        result_df = self.spark.sql(validation_query)
-        result_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
+        # Construct the query for unmatched records
+        unmatched_query = self.construct_unmatched_query()
+        unmatched_df = self.spark.sql(unmatched_query)
+        
+        # Write the unmatched records to the result table
+        unmatched_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
         logger.info(
-            "Data validation complete. Results stored in table: %s", self.result_table
+            "Data validation complete. Unmatched records stored in table: %s", self.result_table
         )
 
-    def construct_validation_query(self):
+    def construct_unmatched_query(self):
         """
-        Construct the SQL query for data validation.
+        Construct the SQL query for finding unmatched records.
 
         :return: SQL query string
         """
-        validation_conditions = " AND ".join(
+        unmatched_conditions = " OR ".join(
             [
-                f"{col}_a IS NOT NULL AND {col}_b IS NOT NULL "
-                f"AND {col}_a = {col}_b" for col in self.key_columns
+                f"{col}_a IS NULL OR {col}_b IS NULL OR {col}_a != {col}_b"
+                for col in self.key_columns
             ]
         )
         query = f"""
-            SELECT *,
-            CASE
-                WHEN {validation_conditions} THEN 'match'
-                ELSE 'mismatch'
-            END AS validation_result
+            SELECT *
             FROM joined_view
+            WHERE {unmatched_conditions}
         """
         return query
 
@@ -123,5 +143,11 @@ if __name__ == "__main__":
         key_columns=["key_column1", "key_column2"]
     )
     ab_test = ABTestDeltaTables(config)
+
+    # Check if data files are equal and recreate the cloned table if not
+    if not ab_test.check_data_files_equal(config.table_a, config.table_b):
+        ab_test.recreate_cloned_table()
+
+    # Compare schemas and validate data
     ab_test.compare_schemas()
     ab_test.validate_data()
