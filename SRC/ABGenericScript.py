@@ -6,7 +6,6 @@ and row-by-row data validation.
 
 import logging
 from pyspark.sql import SparkSession
-from delta.tables import DeltaTable
 from dataclasses import dataclass
 from typing import List
 
@@ -63,26 +62,6 @@ class ABTestDeltaTables:
             logger.info("Schemas are identical.")
         else:
             logger.info("Schemas differ: %s", diff)
-
-    def check_data_files_equal(self, table_a, table_b):
-        """
-        Check if the data files for two tables are equal.
-        """
-        df_a = self.spark.sql(f"DESCRIBE DETAIL {table_a}").select("numFiles", "sizeInBytes").collect()
-        df_b = self.spark.sql(f"DESCRIBE DETAIL {table_b}").select("numFiles", "sizeInBytes").collect()
-
-        if len(df_a) == 0 or len(df_b) == 0:
-            return False
-
-        return df_a[0] == df_b[0]
-
-    def recreate_cloned_table(self):
-        """
-        Recreate the cloned table from the main table.
-        """
-        self.spark.sql(f"DROP TABLE IF EXISTS {self.table_b}")
-        self.spark.sql(f"CREATE TABLE {self.table_b} AS SELECT * FROM {self.table_a}")
-        logger.info(f"Cloned table '{self.table_b}' recreated")
 
     def validate_data(self):
         """
@@ -143,10 +122,6 @@ if __name__ == "__main__":
         key_columns=["key_column1", "key_column2"]
     )
     ab_test = ABTestDeltaTables(config)
-
-    # Check if data files are equal and recreate the cloned table if not
-    if not ab_test.check_data_files_equal(config.table_a, config.table_b):
-        ab_test.recreate_cloned_table()
 
     # Compare schemas and validate data
     ab_test.compare_schemas()
