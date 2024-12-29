@@ -107,7 +107,11 @@ class ABTestDeltaTables:
             ]
         )
         query = f"""
-            SELECT *
+            SELECT *,
+            CASE
+                WHEN {unmatched_conditions} THEN 'unmatched'
+                ELSE 'matched'
+            END AS validation_result
             FROM joined_view
             WHERE {unmatched_conditions}
         """
