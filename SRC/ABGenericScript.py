@@ -46,7 +46,7 @@ class ABTestDeltaTables:
 
         :param config: An instance of ABTestConfig containing the configuration.
         """
-        self.spark = spark  # Use the existing Spark session in Databricks
+        self.spark = SparkSession.builder.getOrCreate()  # Use the existing Spark session in Databricks
         self.table_a = config.table_a
         self.table_b = config.table_b
         self.result_table = config.result_table
@@ -71,9 +71,10 @@ class ABTestDeltaTables:
         df_a = self.spark.read.format("delta").table(self.table_a)
         df_b = self.spark.read.format("delta").table(self.table_b)
 
-        # Rename columns in df_a and df_b to avoid conflicts
-        for col in self.key_columns:
+        # Rename all columns in df_a and df_b to avoid conflicts
+        for col in df_a.columns:
             df_a = df_a.withColumnRenamed(col, f"{col}_a")
+        for col in df_b.columns:
             df_b = df_b.withColumnRenamed(col, f"{col}_b")
 
         # Create join condition based on key columns
