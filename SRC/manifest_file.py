@@ -14,8 +14,7 @@ shallow_clone_table = "data_catlg_sclone"
 def get_data_files(table_name):
     details_df = spark.sql(f"DESCRIBE DETAIL {table_name}")
     details = details_df.collect()[0].asDict()
-    location = details['location']
-    return location
+    return details['location']
 
 # Function to get the data files from a table using DESCRIBE HISTORY
 def get_operation_metrics(table_name):
@@ -24,7 +23,7 @@ def get_operation_metrics(table_name):
     for row in history_df.collect():
         metrics = row.asDict().get('operationMetrics')
         if metrics:
-            operation_metrics.append(json.loads(metrics))
+            operation_metrics.append(metrics)
     return operation_metrics
 
 # Get data files location for the main table
