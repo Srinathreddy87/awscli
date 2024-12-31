@@ -1,22 +1,23 @@
-from pyspark.sql.functions import input_file_name
+from delta.tables import DeltaTable
+from pyspark.sql.functions import col
 
-# Paths to the main table and shallow clone table
-main_table_path = "path_to_main_table"
-shallow_clone_table_path = "path_to_shallow_clone_table"
+# Table names
+main_table_name = "main_table_name"
+shallow_clone_table_name = "shallow_clone_table_name"
 
-# Load the data files for both tables
-main_table_df = spark.read.format("delta").load(main_table_path).withColumn("file_name", input_file_name())
-shallow_clone_df = spark.read.format("delta").load(shallow_clone_table_path).withColumn("file_name", input_file_name())
+# Load Delta tables
+main_table = DeltaTable.forName(spark, main_table_name)
+shallow_clone_table = DeltaTable.forName(spark, shallow_clone_table_name)
 
-# Extract and compare file names
-main_files = main_table_df.select("file_name").distinct()
-clone_files = shallow_clone_df.select("file_name").distinct()
+# Extract data files for the main table and shallow clone
+main_files_df = main_table.toDF().select(input_file_name().alias("file_path")).distinct()
+clone_files_df = shallow_clone_table.toDF().select(input_file_name().alias("file_path")).distinct()
 
-# Find unmatched files
-main_only_files = main_files.subtract(clone_files)
-clone_only_files = clone_files.subtract(main_files)
+# Compare file paths
+main_only_files = main_files_df.subtract(clone_files_df)
+clone_only_files = clone_files_df.subtract(main_files_df)
 
-# Show differences
+# Display differences
 print("Files present in Main Table but not in Shallow Clone:")
 main_only_files.show(truncate=False)
 
