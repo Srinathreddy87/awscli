@@ -1,41 +1,16 @@
-from pyspark.sql import SparkSession
-import json
+from pyspark.sql.functions import col
 
-# Initialize Spark Session
-spark = SparkSession.builder \
-    .appName("DataFilesComparison") \
-    .getOrCreate()
+# Load Delta tables
+main_table = "path_to_main_table"
+shallow_clone_table = "path_to_shallow_clone_table"
 
-# Define the main table and the shallow clone table names
-main_table = "data_catlg"
-shallow_clone_table = "data_catlg_sclone"
+# Extract data files from Delta logs
+main_table_files = spark.read.format("delta").load(main_table)._jdf.files().get()
+shallow_clone_files = spark.read.format("delta").load(shallow_clone_table)._jdf.files().get()
 
-# Function to get the data files from a table using DESCRIBE DETAIL
-def get_data_files(table_name):
-    details_df = spark.sql(f"DESCRIBE DETAIL {table_name}")
-    details = details_df.collect()[0].asDict()
-    return details['location']
+# Compare files
+main_files_df = spark.createDataFrame(main_table_files).select("path")
+shallow_clone_files_df = spark.createDataFrame(shallow_clone_files).select("path")
 
-# Function to get the data files from a table using DESCRIBE HISTORY
-def get_data_files_from_history(table_name):
-    history_df = spark.sql(f"DESCRIBE HISTORY {table_name}")
-    operation_metrics = []
-    for row in history_df.collect():
-        metrics = row.asDict().get('operationMetrics')
-        if metrics and 'addedFiles' in metrics:
-            operation_metrics.append(json.loads(metrics)['addedFiles'])
-    return operation_metrics
-
-# Get data files for the main table
-main_table_files = get_data_files_from_history(main_table)
-print(f"Data files for main table '{main_table}': {main_table_files}")
-
-# Get data files for the shallow clone table
-shallow_clone_files = get_data_files_from_history(shallow_clone_table)
-print(f"Data files for shallow clone table '{shallow_clone_table}': {shallow_clone_files}")
-
-# Compare the data files and print the result
-if set(main_table_files) == set(shallow_clone_files):
-    print("The data files used by the main table and the shallow clone table match.")
-else:
-    print("The data files used by the main table and the shallow clone table do not match.")
+unmatched_files = main_files_df.subtract(shallow_clone_files_df)
+unmatched_files.show()
