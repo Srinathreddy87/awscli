@@ -20,3 +20,13 @@ main_only_files.show(truncate=False)
 
 print("Files in Shallow Clone but not in Main Table:")
 clone_only_files.show(truncate=False)
+
+
+
+-- Checksum comparison for the entire table
+SELECT MD5(CONCAT_WS(',', *)) AS checksum FROM en_poc_dev.sparta_work.user_data;
+SELECT MD5(CONCAT_WS(',', *)) AS checksum FROM en_poc_dev.sparta_work.user_data_stage;
+
+-- Grouped checksum (useful for large tables)
+SELECT SUM(CRC32(CONCAT_WS(',', *))) AS checksum FROM en_poc_dev.sparta_work.user_data;
+SELECT SUM(CRC32(CONCAT_WS(',', *))) AS checksum FROM en_poc_dev.sparta_work.user_data_stage;
