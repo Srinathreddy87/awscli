@@ -1,3 +1,8 @@
+"""
+This module provides logging utilities for setting up and configuring loggers.
+It includes functions for creating loggers with various logging levels and handlers.
+"""
+
 import logging
 from logging import (
     BASIC_FORMAT,
@@ -64,30 +69,39 @@ def get_logger(name, log_level="INFO", log_file=None):
     return logger
 
 def critical(logger, msg):
+    """Log a critical message."""
     logger.critical(msg)
 
 def debug(logger, msg):
+    """Log a debug message."""
     logger.debug(msg)
 
 def exception(logger, msg):
+    """Log an exception message."""
     logger.exception(msg)
 
 def warn(logger, msg):
+    """Log a warning message."""
     logger.warn(msg)
 
 def warning(logger, msg):
+    """Log a warning message."""
     logger.warning(msg)
 
 def raiseException(logger, exc):
+    """Log an exception."""
     logger.exception(exc)
 
 def log(logger, level, msg):
+    """Log a message with a specified level."""
     logger.log(level, msg)
 
 def info(logger, msg):
+    """Log an info message."""
     logger.info(msg)
 
 def captureWarnings(capture):
+    """Capture warnings with logging."""
     logging.captureWarnings(capture)
 
 # Example usage
