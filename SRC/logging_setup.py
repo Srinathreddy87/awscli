@@ -35,10 +35,10 @@ __all__ = [
     "exception",
     "warn",
     "warning",
-    "raiseException",
+    "raise_exception",
     "log",
     "info",
-    "captureWarnings",
+    "capture_warnings",
 ]
 
 def get_logger(name, log_level="INFO", log_file=None):
@@ -91,7 +91,7 @@ def warning(logger, msg):
     """Log a warning message."""
     logger.warning(msg)
 
-def raiseException(logger, exc):
+def raise_exception(logger, exc):
     """Log an exception."""
     logger.exception(exc)
 
@@ -103,7 +103,7 @@ def info(logger, msg):
     """Log an info message."""
     logger.info(msg)
 
-def captureWarnings(capture):
+def capture_warnings(capture):
     """Capture warnings with logging."""
     logging.captureWarnings(capture)
 
