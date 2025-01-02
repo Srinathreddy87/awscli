@@ -1,6 +1,7 @@
 """
 This module provides logging utilities for setting up and configuring loggers.
-It includes functions for creating loggers with various logging levels and handlers.
+It includes functions for creating loggers with various logging levels and 
+handlers.
 """
 
 import logging
@@ -54,7 +55,9 @@ def get_logger(name, log_level="INFO", log_file=None):
 
     ch = logging.StreamHandler()
     ch.setLevel(log_level)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     ch.setFormatter(formatter)
 
     if not logger.hasHandlers():
@@ -110,5 +113,5 @@ if __name__ == "__main__":
     info(logger, "This is an info message")
     debug(logger, "This is a debug message")
     warning(logger, "This is a warning message")
-    error(logger, "This is an error message")
+    logger.error("This is an error message")
     critical(logger, "This is a critical message")
