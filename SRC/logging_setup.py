@@ -109,9 +109,9 @@ def capture_warnings(capture):
 
 # Example usage
 if __name__ == "__main__":
-    logger = get_logger(__name__, "DEBUG", "example.log")
-    info(logger, "This is an info message")
-    debug(logger, "This is a debug message")
-    warning(logger, "This is a warning message")
-    logger.error("This is an error message")
-    critical(logger, "This is a critical message")
+    example_logger = get_logger(__name__, "DEBUG", "example.log")
+    info(example_logger, "This is an info message")
+    debug(example_logger, "This is a debug message")
+    warning(example_logger, "This is a warning message")
+    example_logger.error("This is an error message")
+    critical(example_logger, "This is a critical message")
