@@ -84,39 +84,30 @@ class ABTestDeltaTables:
         joined_df = df_a.join(df_b, join_condition, "outer").select(df_a["*"], df_b["*"])
         joined_df.createOrReplaceTempView("joined_view")
 
-        # Construct the query for unmatched records
-        unmatched_query = self.construct_unmatched_query()
-        unmatched_df = self.spark.sql(unmatched_query)
-        
-        # Write the unmatched records to the result table
-        unmatched_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
-        logger.info(
-            "Data validation complete. Unmatched records stored in table: %s", self.result_table
-        )
-
-    def construct_unmatched_query(self):
-        """
-        Construct the SQL query for finding unmatched records.
-
-        :return: SQL query string
-        """
-        unmatched_conditions = " OR ".join(
-            [
-                f"{col}_a IS NULL OR {col}_b IS NULL OR {col}_a != {col}_b"
-                for col in self.key_columns
-            ]
-        )
-        query = f"""
-            SELECT *,
+        # Construct the query for comparison result for each column
+        comparison_columns = [
+            f"""
             CASE
-                WHEN {unmatched_conditions} THEN 'unmatched'
-                ELSE 'matched'
-            END AS validation_result
-            FROM joined_view
-            WHERE {unmatched_conditions}
-        """
-        return query
+                WHEN {col}_a IS NULL OR {col}_b IS NULL THEN 'unmatch'
+                WHEN {col}_a = {col}_b THEN 'match'
+                ELSE 'unmatch'
+            END AS {col}_result
+            """ for col in df_a.columns if col.endswith('_a')
+        ]
 
+        comparison_query = f"""
+        SELECT *,
+        {', '.join(comparison_columns)}
+        FROM joined_view
+        """
+
+        comparison_df = self.spark.sql(comparison_query)
+        
+        # Write the comparison results to the result table
+        comparison_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
+        logger.info(
+            "Data validation complete. Comparison results stored in table: %s", self.result_table
+        )
 
 if __name__ == "__main__":
     ab_test_config = ABTestConfig(
