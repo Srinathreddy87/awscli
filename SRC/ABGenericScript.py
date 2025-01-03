@@ -94,7 +94,7 @@ class ABTestDeltaTables:
                 WHEN {renamed_columns_a[col]} IS NULL OR {renamed_columns_b[col]} IS NULL THEN 'unmatch'
                 WHEN {renamed_columns_a[col]} = {renamed_columns_b[col]} THEN 'match'
                 ELSE 'unmatch'
-            END AS {col}_result
+            END AS {col.replace('_a', '')}_result
             """ for col in renamed_columns_a.keys()
         ]
 
@@ -104,7 +104,7 @@ class ABTestDeltaTables:
             {', '.join(renamed_columns_b.values())},
             {', '.join(comparison_columns)},
             CASE
-                WHEN {', '.join([f'{col}_result' for col in renamed_columns_a.keys()])} LIKE '%unmatch%' THEN 'unmatch'
+                WHEN {' OR '.join([f'{col.replace("_a", "")}_result = \'unmatch\'' for col in renamed_columns_a.keys()])} THEN 'unmatch'
                 ELSE 'match'
             END AS validation_result
         FROM joined_view
