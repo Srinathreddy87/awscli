@@ -103,11 +103,18 @@ class ABTestDeltaTables:
 
         comparison_df = self.spark.sql(comparison_query)
         
+        # Debugging: Show the schema and first few rows of the DataFrame
+        comparison_df.printSchema()
+        comparison_df.show(10)
+
         # Write the comparison results to the result table
-        comparison_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
-        logger.info(
-            "Data validation complete. Comparison results stored in table: %s", self.result_table
-        )
+        try:
+            comparison_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
+            logger.info(
+                "Data validation complete. Comparison results stored in table: %s", self.result_table
+            )
+        except Exception as e:
+            logger.error("Failed to save comparison results: %s", e)
 
 if __name__ == "__main__":
     ab_test_config = ABTestConfig(
