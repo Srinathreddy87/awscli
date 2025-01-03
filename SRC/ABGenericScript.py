@@ -121,9 +121,10 @@ class ABTestDeltaTables:
             comparison_df.write.format("delta").mode("overwrite").saveAsTable(self.result_table)
             logger.info(
                 "Data validation complete. Comparison results stored in table: %s", self.result_table
-            )
-        except Exception as e:
+            )        
+        except (AnalysisException, IllegalArgumentException, StreamingQueryException) as e:
             logger.error("Failed to save comparison results: %s", e)
+
 
 if __name__ == "__main__":
     ab_test_config = ABTestConfig(
