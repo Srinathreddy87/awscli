@@ -71,10 +71,13 @@ class ABTestDeltaTables:
         df_b = self.spark.read.format("delta").table(self.table_b)
 
         # Rename all columns in df_a and df_b to avoid conflicts
-        for col in df_a.columns:
-            df_a = df_a.withColumnRenamed(col, f"{col}_a")
-        for col in df_b.columns:
-            df_b = df_b.withColumnRenamed(col, f"{col}_b")
+        renamed_columns_a = {col: f"{col}_a" for col in df_a.columns}
+        renamed_columns_b = {col: f"{col}_b" for col in df_b.columns}
+
+        for col, new_col in renamed_columns_a.items():
+            df_a = df_a.withColumnRenamed(col, new_col)
+        for col, new_col in renamed_columns_b.items():
+            df_b = df_b.withColumnRenamed(col, new_col)
 
         # Create join condition based on key columns
         join_condition = [
@@ -88,16 +91,22 @@ class ABTestDeltaTables:
         comparison_columns = [
             f"""
             CASE
-                WHEN {col}_a IS NULL OR {col}_b IS NULL THEN 'unmatch'
-                WHEN {col}_a = {col}_b THEN 'match'
+                WHEN {renamed_columns_a[col]} IS NULL OR {renamed_columns_b[col]} IS NULL THEN 'unmatch'
+                WHEN {renamed_columns_a[col]} = {renamed_columns_b[col]} THEN 'match'
                 ELSE 'unmatch'
             END AS {col}_result
-            """ for col in df_a.columns if col.endswith('_a')
+            """ for col in renamed_columns_a.keys()
         ]
 
         comparison_query = f"""
-        SELECT *,
-        {', '.join(comparison_columns)}
+        SELECT
+            {', '.join(renamed_columns_a.values())},
+            {', '.join(renamed_columns_b.values())},
+            {', '.join(comparison_columns)},
+            CASE
+                WHEN {', '.join([f'{col}_result' for col in renamed_columns_a.keys()])} LIKE '%unmatch%' THEN 'unmatch'
+                ELSE 'match'
+            END AS validation_result
         FROM joined_view
         """
 
@@ -121,7 +130,7 @@ if __name__ == "__main__":
         table_a="table_a",
         table_b="table_b",
         result_table="result_table",
-        key_columns=["key_column1", "key_column2"]
+        key_columns=["clm_id"]
     )
     ab_test = ABTestDeltaTables(ab_test_config)
 
