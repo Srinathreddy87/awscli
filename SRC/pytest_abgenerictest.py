@@ -1,48 +1,49 @@
+"""
+This module contains tests for the ABTestDeltaTables class in the
+ABGenericScript module.
+"""
+
 import logging
 import pytest
-from pyspark.sql import SparkSession
+from unittest.mock import MagicMock
+from mocks.mock_spark import mock_spark_session
 from SRC.ABGenericScript import ABTestDeltaTables, ABTestConfig
+from SRC.logging_setup import get_logger, info
+
+# Set up the logger
+logger = get_logger(__name__, "DEBUG")
 
 
-@pytest.fixture(scope="module")
-def spark():
-    # Initialize a Spark session for testing
-    spark = (
-        SparkSession.builder.appName("TestABTestDeltaTables")
-        .master("local[*]")
-        .getOrCreate()
-    )
-    yield spark
-    spark.stop()
-
-
-@pytest.fixture
-def config():
-    # Example configuration for testing
-    return ABTestConfig(
+@pytest.fixture(name="ab_test")
+def ab_test_fixture(mock_spark_session):
+    """
+    Create an instance of ABTestDeltaTables with a mock Spark session.
+    """
+    dbutils_mock = MagicMock()
+    config = ABTestConfig(
         table_a="test_table_a",
         table_b="test_table_b",
         result_table="test_result_table",
         key_columns=["key_column1", "key_column2"],
     )
+    ab_test = ABTestDeltaTables(config)
+    ab_test.spark = mock_spark_session
+    return ab_test
 
 
-@pytest.fixture
-def ab_test(spark, config):
-    # Initialize ABTestDeltaTables with the test config
-    return ABTestDeltaTables(config)
-
-
-def test_compare_schemas(spark, ab_test, caplog):
+def test_compare_schemas(ab_test, caplog):
+    """
+    Test the compare_schemas method.
+    """
     # Create sample DataFrames for table_a and table_b
     data_a = [("value1", "value2")]
     schema_a = ["key_column1", "key_column2"]
-    df_a = spark.createDataFrame(data_a, schema_a)
+    df_a = ab_test.spark.createDataFrame(data_a, schema_a)
     df_a.write.format("delta").mode("overwrite").saveAsTable("test_table_a")
 
     data_b = [("value1", "value2")]
     schema_b = ["key_column1", "key_column2"]
-    df_b = spark.createDataFrame(data_b, schema_b)
+    df_b = ab_test.spark.createDataFrame(data_b, schema_b)
     df_b.write.format("delta").mode("overwrite").saveAsTable("test_table_b")
 
     # Compare schemas
@@ -51,29 +52,37 @@ def test_compare_schemas(spark, ab_test, caplog):
 
     # Check if schemas are logged as identical
     assert "Schemas are identical." in caplog.text
+    info(logger, "Schemas compared successfully.")
 
 
-def test_validate_data(spark, ab_test):
+def test_validate_data(ab_test):
+    """
+    Test the validate_data method.
+    """
     # Create sample DataFrames for table_a and table_b
     data_a = [(1, "value1_a", "value2_a")]
     schema_a = ["key_column1", "key_column2", "column_a"]
-    df_a = spark.createDataFrame(data_a, schema_a)
+    df_a = ab_test.spark.createDataFrame(data_a, schema_a)
     df_a.write.format("delta").mode("overwrite").saveAsTable("test_table_a")
 
     data_b = [(1, "value1_b", "value2_b")]
     schema_b = ["key_column1", "key_column2", "column_b"]
-    df_b = spark.createDataFrame(data_b, schema_b)
+    df_b = ab_test.spark.createDataFrame(data_b, schema_b)
     df_b.write.format("delta").mode("overwrite").saveAsTable("test_table_b")
 
     # Validate data
     ab_test.validate_data()
 
     # Check if the result table is created
-    result_df = spark.read.format("delta").table("test_result_table")
+    result_df = ab_test.spark.read.format("delta").table("test_result_table")
     assert result_df.count() > 0
+    info(logger, "Data validated successfully.")
 
 
 def test_construct_unmatched_query(ab_test):
+    """
+    Test the construct_unmatched_query method.
+    """
     # Construct the unmatched query
     query = ab_test.construct_unmatched_query()
     expected_conditions = (
@@ -91,6 +100,7 @@ def test_construct_unmatched_query(ab_test):
         WHERE {expected_conditions}
     """
     assert query.strip() == expected_query.strip()
+    info(logger, "Unmatched query constructed successfully.")
 
 
 if __name__ == "__main__":
