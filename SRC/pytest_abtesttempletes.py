@@ -3,23 +3,10 @@ This module contains tests for the TempTableCreator class in the
 ABTestTemptables module.
 """
 
+import logging
 import pytest
-from pyspark.sql import SparkSession
+from mocks.mock_spark import mock_spark_session
 from SRC.ABTestTemptables import TempTableCreator, TableCompareConfig
-
-
-@pytest.fixture(scope="module")
-def spark():
-    """
-    Initialize a Spark session for testing.
-    """
-    spark = (
-        SparkSession.builder.appName("TestTempTableCreator")
-        .master("local[*]")
-        .getOrCreate()
-    )
-    yield spark
-    spark.stop()
 
 
 @pytest.fixture
@@ -36,20 +23,20 @@ def config():
 
 
 @pytest.fixture
-def temp_table_creator(spark, config):
+def temp_table_creator(mock_spark_session, config):
     """
     Initialize TempTableCreator with the test config.
     """
     return TempTableCreator(config)
 
 
-def test_normalize_column_names(spark, temp_table_creator):
+def test_normalize_column_names(mock_spark_session, temp_table_creator):
     """
     Test the normalize_column_names method.
     """
     # Create a sample DataFrame with whitespace in column names
     data = [("value1", "value2")]
-    df = spark.createDataFrame(data, [" col1 ", " col2 "])
+    df = mock_spark_session.createDataFrame(data, [" col1 ", " col2 "])
 
     # Normalize column names
     df_normalized = temp_table_creator.normalize_column_names(df)
@@ -58,13 +45,13 @@ def test_normalize_column_names(spark, temp_table_creator):
     assert df_normalized.columns == ["col1", "col2"]
 
 
-def test_print_column_names(spark, temp_table_creator, caplog):
+def test_print_column_names(mock_spark_session, temp_table_creator, caplog):
     """
     Test the print_column_names method.
     """
     # Create a sample DataFrame
     data = [("value1", "value2")]
-    df = spark.createDataFrame(data, ["col1", "col2"])
+    df = mock_spark_session.createDataFrame(data, ["col1", "col2"])
 
     # Print column names
     with caplog.at_level(logging.INFO):
@@ -74,42 +61,47 @@ def test_print_column_names(spark, temp_table_creator, caplog):
     assert "Columns in test_table: ['col1', 'col2']" in caplog.text
 
 
-def test_check_data_files_equal(spark, temp_table_creator):
+def test_check_data_files_equal(mock_spark_session, temp_table_creator):
     """
-    This test requires actual Delta tables, so it might be skipped in a CI
-    pipeline. Create mock Delta tables and validate the method's functionality.
-    """
-    pass
-
-
-def test_create_initial_temp_tables(spark, temp_table_creator):
-    """
-    This test requires actual Delta tables, so it might be skipped in a CI
-    pipeline. Create mock Delta tables and validate the method's functionality.
+    This test requires actual Delta tables,
+    so it might be skipped in a CI pipeline.
+    Create mock Delta tables and validate the method's functionality.
     """
     pass
 
 
-def test_create_final_temp_tables(spark, temp_table_creator):
+def test_create_initial_temp_tables(mock_spark_session, temp_table_creator):
     """
-    This test requires actual Delta tables, so it might be skipped in a CI
-    pipeline. Create mock Delta tables and validate the method's functionality.
-    """
-    pass
-
-
-def test_drop_initial_temp_tables(spark, temp_table_creator):
-    """
-    This test requires actual Delta tables, so it might be skipped in a CI
-    pipeline. Create mock Delta tables and validate the method's functionality.
+    This test requires actual Delta tables,
+    so it might be skipped in a CI pipeline.
+    Create mock Delta tables and validate the method's functionality.
     """
     pass
 
 
-def test_show_temp_tables(spark, temp_table_creator):
+def test_create_final_temp_tables(mock_spark_session, temp_table_creator):
     """
-    This test requires actual Delta tables, so it might be skipped in a CI
-    pipeline. Create mock Delta tables and validate the method's functionality.
+    This test requires actual Delta tables,
+    so it might be skipped in a CI pipeline.
+    Create mock Delta tables and validate the method's functionality.
+    """
+    pass
+
+
+def test_drop_initial_temp_tables(mock_spark_session, temp_table_creator):
+    """
+    This test requires actual Delta tables,
+    so it might be skipped in a CI pipeline.
+    Create mock Delta tables and validate the method's functionality.
+    """
+    pass
+
+
+def test_show_temp_tables(mock_spark_session, temp_table_creator):
+    """
+    This test requires actual Delta tables,
+    so it might be skipped in a CI pipeline.
+    Create mock Delta tables and validate the method's functionality.
     """
     pass
 
