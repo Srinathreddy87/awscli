@@ -3,7 +3,6 @@ This module contains tests for the ABTestDeltaTables class in the
 ABGenericScript module.
 """
 
-import logging
 import pytest
 from unittest.mock import MagicMock
 from mocks.mock_spark import mock_spark_session
