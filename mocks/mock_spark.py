@@ -245,3 +245,6 @@ class MockSparkSession:
         query = re.sub(r"(['\"].*?['\"]|\s+)", replace_spaces_outside_quotes, query)
         query = re.sub(r"\b\w+\b", capitalize_match, query)
         return query
+    def mock_spark_session():
+        """Create a Mock spark Session."""
+        return MockSparkSession()
