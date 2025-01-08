@@ -3,11 +3,15 @@ This module contains tests for the TempTableCreator class in the
 ABTestTemptables module.
 """
 
-import logging
 import pytest
 from unittest.mock import MagicMock
 from mocks.mock_spark import mock_spark_session
 from SRC.ABTestTemptables import TempTableCreator, TableCompareConfig
+from SRC.logging_setup import get_logger, info, debug, warning
+
+
+# Set up the logger
+logger = get_logger(__name__, "DEBUG")
 
 
 @pytest.fixture(name="ab_temp_table")
@@ -16,42 +20,47 @@ def ab_temptable_fixture(mock_spark_session):
     Create an instance of TempTableCreator with a mock Spark session.
     """
     dbutils_mock = MagicMock()
-    temp_table_creator = TempTableCreator(mock_spark_session, dbutils_mock)
-    table_compare_config = TableCompareConfig(mock_spark_session, dbutils_mock)
-    return temp_table_creator, table_compare_config
+    config = TableCompareConfig(
+        limit=100,
+        main_table_name="test_main_table",
+        cloned_table_name="test_cloned_table",
+        key_column_name=["key_column"],
+    )
+    temp_table_creator = TempTableCreator(config)
+    return temp_table_creator
 
 
 def test_normalize_column_names(ab_temp_table):
     """
     Test the normalize_column_names method.
     """
-    temp_table_creator, _ = ab_temp_table
     # Create a sample DataFrame with whitespace in column names
     data = [("value1", "value2")]
-    df = temp_table_creator.spark.createDataFrame(data, [" col1 ", " col2 "])
+    df = ab_temp_table.spark.createDataFrame(data, [" col1 ", " col2 "])
 
     # Normalize column names
-    df_normalized = temp_table_creator.normalize_column_names(df)
+    df_normalized = ab_temp_table.normalize_column_names(df)
 
     # Check if column names are normalized
     assert df_normalized.columns == ["col1", "col2"]
+    info(logger, "Column names normalized successfully.")
 
 
 def test_print_column_names(ab_temp_table, caplog):
     """
     Test the print_column_names method.
     """
-    temp_table_creator, _ = ab_temp_table
     # Create a sample DataFrame
     data = [("value1", "value2")]
-    df = temp_table_creator.spark.createDataFrame(data, ["col1", "col2"])
+    df = ab_temp_table.spark.createDataFrame(data, ["col1", "col2"])
 
     # Print column names
     with caplog.at_level(logging.INFO):
-        temp_table_creator.print_column_names(df, "test_table")
+        ab_temp_table.print_column_names(df, "test_table")
 
     # Check if column names are logged
     assert "Columns in test_table: ['col1', 'col2']" in caplog.text
+    info(logger, "Column names printed and logged successfully.")
 
 
 def test_check_data_files_equal(ab_temp_table):
