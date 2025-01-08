@@ -18,7 +18,6 @@ def ab_test_fixture(mock_spark_session):
     """
     Create an instance of ABTestDeltaTables with a mock Spark session.
     """
-    dbutils_mock = MagicMock()
     config = ABTestConfig(
         table_a="test_table_a",
         table_b="test_table_b",
