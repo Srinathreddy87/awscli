@@ -101,8 +101,10 @@ class ABTestDeltaTables:
         comparison_columns = [
             f"""
             CASE
-                WHEN {renamed_columns_a[col]} IS NULL OR {renamed_columns_b[col]} IS NULL THEN 'unmatch'
-                WHEN {renamed_columns_a[col]} = {renamed_columns_b[col]} THEN 'match'
+                WHEN {renamed_columns_a[col]} IS NULL OR 
+                     {renamed_columns_b[col]} IS NULL THEN 'unmatch'
+                WHEN {renamed_columns_a[col]} = 
+                     {renamed_columns_b[col]} THEN 'match'
                 ELSE 'unmatch'
             END AS {col.replace('_a', '')}_result
             """
@@ -115,7 +117,10 @@ class ABTestDeltaTables:
             {', '.join(renamed_columns_b.values())},
             {', '.join(comparison_columns)},
             CASE
-                WHEN {' OR '.join([f'{col.replace("_a", "")}_result = \'unmatch\'' for col in renamed_columns_a.keys()])} THEN 'unmatch'
+                WHEN {' OR '.join(
+                    [f'{col.replace("_a", "")}_result = \'unmatch\''
+                     for col in renamed_columns_a.keys()])} 
+                     THEN 'unmatch'
                 ELSE 'match'
             END AS validation_result
         FROM joined_view
@@ -129,9 +134,8 @@ class ABTestDeltaTables:
 
         # Write the comparison results to the result table
         try:
-            comparison_df.write.format("delta").mode("overwrite").saveAsTable(
-                self.config.result_table
-            )
+            comparison_df.write.format("delta").mode("overwrite")\
+                .saveAsTable(self.config.result_table)
             logger.info(
                 "Data validation complete. Comparison results stored in table: %s",
                 self.config.result_table,
