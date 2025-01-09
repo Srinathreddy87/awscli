@@ -128,10 +128,6 @@ class ABTestDeltaTables:
 
         comparison_df = self.spark.sql(comparison_query)
 
-        # Debugging: Show the schema and first few rows of the DataFrame
-        comparison_df.printSchema()
-        comparison_df.show(10)
-
         # Write the comparison results to the result table
         try:
             comparison_df.write.format("delta").mode("overwrite")\
@@ -162,9 +158,7 @@ class ABTestDeltaTables:
         if post_fix == "feature":
             table_b = stage_path.replace("_stage", "")
             return f"{before_table}_{post_fix}"
-        else:
-            return stage_path
-
+            
     def _parse_table_settings(self, table):
         """
         Parse table settings and derive before_table and after_table.
@@ -173,7 +167,7 @@ class ABTestDeltaTables:
         post_fix = next(
             (opt["post_fix"] for opt in table.get("options", []) 
              if "post_fix" in opt),
-            "",
+            ""
         )
         # Derive result_table
         result_table = table_a + "_ab_comparison_result"
