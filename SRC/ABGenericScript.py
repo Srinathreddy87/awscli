@@ -159,7 +159,7 @@ class ABTestDeltaTables:
         Determine table_b path for data comparison.
         """
         stage_path = table_config["stage_table_path"]
-        if self.config.post_fix == "feature":
+        if post_fix == "feature":
             table_b = stage_path.replace("_stage", "")
             return f"{before_table}_{post_fix}"
         else:
@@ -175,8 +175,9 @@ class ABTestDeltaTables:
              if "post_fix" in opt),
             "",
         )
-        result_table = table_a + "ab_comparison_result"
-        config = ABTestConfig(table_a, post_fix, result_table, ["col_id"])
+        # Derive result_table
+        result_table = table_a + "_ab_comparison_result"
+        self.config.result_table = result_table
 
         # Get table config
         table_config = self._get_table_config(table_a)
