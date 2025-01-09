@@ -7,16 +7,11 @@ schema comparison and row-by-row data validation.
 import logging
 from dataclasses import dataclass
 from typing import List
-from pyspark.sql import SparkSession
+import src.domain_reference as dr
+from SRC.logging_setup import get_logger
 
 # Set up a logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+logger = get_logger(__name__, "DEBUG")
 
 
 @dataclass
@@ -26,17 +21,23 @@ class ABTestConfig:
 
     Attributes:
         table_a (str): Name of the first Delta table (A variant).
-        table_b (str): Name of the second Delta table (B variant).
-        result_table (str): Name of the result Delta table to store comparison
-                            results.
-        key_columns (List[str]): List of key column names used for joining the
-                                 tables.
+        post_fix (str): Postfix for the table name.
+        result_table (str): Name of the result Delta table to store 
+                            comparison results.
+        key_columns (List[str]): List of key column names used for 
+                                 joining the tables.
     """
 
     table_a: str
-    table_b: str
+    post_fix: str
     result_table: str
     key_columns: List[str]
+
+    def __init__(self, table_a, post_fix, result_table, key_columns):
+        self.table_a = table_a
+        self.post_fix = post_fix
+        self.result_table = result_table
+        self.key_columns = key_columns
 
 
 class ABTestDeltaTables:
@@ -44,37 +45,37 @@ class ABTestDeltaTables:
     A class to perform A/B testing on Delta tables in Databricks.
     """
 
-    def __init__(self, config: ABTestConfig):
+    def __init__(self, spark, dbutils, config: ABTestConfig):
         """
         Initialize the A/B test with Delta table names.
 
-        :param config: An instance of ABTestConfig containing the
+        :param spark: Spark session.
+        :param dbutils: Databricks utilities.
+        :param config: An instance of ABTestConfig containing the 
                        configuration.
         """
-        self.spark = SparkSession.builder.getOrCreate()
-        self.table_a = config.table_a
-        self.table_b = config.table_b
-        self.result_table = config.result_table
-        self.key_columns = config.key_columns
+        self.spark = spark
+        self.dbutils = dbutils
+        self.config = config
 
-    def compare_schemas(self):
+    def compare_schemas(self, before_table, after_table):
         """
         Compare the schemas of the two Delta tables.
         """
-        schema_a = self.spark.read.format("delta").table(self.table_a).schema
-        schema_b = self.spark.read.format("delta").table(self.table_b).schema
+        schema_a = self.spark.read.format("delta").table(before_table).schema
+        schema_b = self.spark.read.format("delta").table(after_table).schema
         diff = set(schema_a) ^ set(schema_b)
         if not diff:
             logger.info("Schemas are identical.")
         else:
             logger.info("Schemas differ: %s", diff)
 
-    def validate_data(self):
+    def validate_data(self, before_table, after_table):
         """
         Validate data row-by-row and store results in the result Delta table.
         """
-        df_a = self.spark.read.format("delta").table(self.table_a)
-        df_b = self.spark.read.format("delta").table(self.table_b)
+        df_a = self.spark.read.format("delta").table(before_table)
+        df_b = self.spark.read.format("delta").table(after_table)
 
         # Rename all columns in df_a and df_b to avoid conflicts
         renamed_columns_a = {col: f"{col}_a" for col in df_a.columns}
@@ -87,7 +88,8 @@ class ABTestDeltaTables:
 
         # Create join condition based on key columns
         join_condition = [
-            df_a[f"{col}_a"] == df_b[f"{col}_b"] for col in self.key_columns
+            df_a[f"{col}_a"] == df_b[f"{col}_b"]
+            for col in self.config.key_columns
         ]
 
         joined_df = df_a.join(df_b, join_condition, "outer").select(
@@ -128,11 +130,11 @@ class ABTestDeltaTables:
         # Write the comparison results to the result table
         try:
             comparison_df.write.format("delta").mode("overwrite").saveAsTable(
-                self.result_table
+                self.config.result_table
             )
             logger.info(
                 "Data validation complete. Comparison results stored in table: %s",
-                self.result_table,
+                self.config.result_table,
             )
         except Exception as e:
             logger.error("Failed to save comparison results: %s", e)
@@ -148,21 +150,37 @@ class ABTestDeltaTables:
         table_config = domain_ref.get_table_config(table_a)
         return table_config
 
-    def table_b_table_path(
-        self, table_a, post_fix, table_config, deployment_mode
-    ):
+    def table_b_table_path(self, table_config, before_table, post_fix):
         """
         Determine table_b path for data comparison.
         """
         stage_path = table_config["stage_table_path"]
-        if deployment_mode == "feature":
+        if self.config.post_fix == "feature":
             table_b = stage_path.replace("_stage", "")
-            return f"{table_a}_{post_fix}"
+            return f"{before_table}_{post_fix}"
+        else:
+            return stage_path
 
     def _parse_table_settings(self, table):
+        """
+        Parse table settings and derive before_table and after_table.
+        """
         table_a = table["table"]
         post_fix = next(
-            (opt["post_fix"] for opt in options if "post_fix" in opt), ""
+            (opt["post_fix"] for opt in table.get("options", []) 
+             if "post_fix" in opt),
+            "",
         )
-        result_table = table_a + "ab_compresut"
-        return ABTestConfig(table_a, post_fix, result_table)
+        result_table = table_a + "ab_comparison_result"
+        config = ABTestConfig(table_a, post_fix, result_table, ["col_id"])
+
+        # Get table config
+        table_config = self._get_table_config(table_a)
+
+        # Get before_table and after_table
+        before_table = table_config.get("table_path")
+        after_table = self.table_b_table_path(
+            table_config, before_table, post_fix
+        )
+
+        return before_table, after_table
