@@ -10,26 +10,14 @@ from typing import List, Dict
 import src.domain_reference as dr
 from SRC.logging_setup import get_logger
 from datetime import datetime
-import json
 from pyspark.sql.types import StructType, StructField, StringType, BooleanType, IntegerType, TimestampType
 
 # Set up a logger
 logger = get_logger(__name__, "DEBUG")
 
-# Load the schema from JSON file
-def load_schema_from_json(json_file_path):
-    with open(json_file_path, 'r') as file:
-        schema_dict = json.load(file)
-    
-    fields = [
-        StructField(field['name'], getattr(globals(), field['type'])(), field['nullable'])
-        for field in schema_dict['fields']
-    ]
-    return StructType(fields)
-
-# Path to the JSON schema file
-json_schema_path = 'mocks/ab_final_result_schema.json'
-ab_final_result_schema = load_schema_from_json(json_schema_path)
+# Function to get schema from table
+def get_schema_from_table(spark, table_name):
+    return spark.read.table(table_name).schema
 
 @dataclass
 class ABTestConfig:
@@ -41,8 +29,6 @@ class ABTestConfig:
         post_fix (str): Postfix for the table name.
         result_table (str): Name of the result Delta table to store 
                             comparison results.
-        key_columns (List[str]): List of key column names used for 
-                                 joining the tables.
     """
 
     table_a: str
@@ -146,6 +132,9 @@ class ABTestDeltaTables:
         # Debugging: Show the schema and first few rows of the DataFrame
         comparison_df.printSchema()
         comparison_df.show(10)
+
+        # Get the schema from the result table
+        ab_final_result_schema = get_schema_from_table(self.spark, "ab_final_result")
 
         # Prepare data for ab_final_result table
         results = []
