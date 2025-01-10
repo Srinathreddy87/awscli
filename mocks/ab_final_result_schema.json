@@ -1,0 +1,59 @@
+{
+    "type": "struct",
+    "fields": [
+        {
+            "name": "test_name",
+            "type": "string",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "table_a",
+            "type": "string",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "table_b",
+            "type": "string",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "column_name",
+            "type": "string",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "schema_mismatch",
+            "type": "boolean",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "data_mismatch",
+            "type": "boolean",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "mismatch_count",
+            "type": "integer",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "validation_errors",
+            "type": "string",
+            "nullable": true,
+            "metadata": {}
+        },
+        {
+            "name": "run_date",
+            "type": "timestamp",
+            "nullable": true,
+            "metadata": {}
+        }
+    ]
+}
