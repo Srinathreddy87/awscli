@@ -9,12 +9,27 @@ from dataclasses import dataclass
 from typing import List, Dict
 import src.domain_reference as dr
 from SRC.logging_setup import get_logger
-from SRC.ab_final_result_ddl import ab_final_result_schema  # Import the schema
 from datetime import datetime
+import json
+from pyspark.sql.types import StructType, StructField, StringType, BooleanType, IntegerType, TimestampType
 
 # Set up a logger
 logger = get_logger(__name__, "DEBUG")
 
+# Load the schema from JSON file
+def load_schema_from_json(json_file_path):
+    with open(json_file_path, 'r') as file:
+        schema_dict = json.load(file)
+    
+    fields = [
+        StructField(field['name'], getattr(globals(), field['type'])(), field['nullable'])
+        for field in schema_dict['fields']
+    ]
+    return StructType(fields)
+
+# Path to the JSON schema file
+json_schema_path = 'mocks/ab_final_result_schema.json'
+ab_final_result_schema = load_schema_from_json(json_schema_path)
 
 @dataclass
 class ABTestConfig:
