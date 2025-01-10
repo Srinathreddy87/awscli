@@ -62,7 +62,16 @@ class ABTestDeltaTables:
         :param table_name: Name of the table from which to retrieve the schema.
         :return: The schema as a StructType object.
         """
-        return self.spark.read.table(table_name).schema
+        # Extract catalog and schema names and append with "sparta_audit_result"
+        parts = table_name.split('.')
+        if len(parts) != 3:
+            raise ValueError("Table name must be in the format 'catalog.schema.table'")
+        
+        catalog_name, schema_name, _ = parts
+        audit_table_name = f"{catalog_name}.{schema_name}.sparta_audit_result"
+        
+        # Retrieve the schema from the audit table
+        return self.spark.read.table(audit_table_name).schema
 
     def compare_schemas(self, before_table, after_table):
         """
@@ -139,7 +148,7 @@ class ABTestDeltaTables:
         comparison_df.show(10)
 
         # Get the schema from the result table
-        ab_final_result_schema = self.get_schema_from_table("ab_final_result")
+        ab_final_result_schema = self.get_schema_from_table(before_table)
 
         # Prepare data for ab_final_result table
         results = []
