@@ -15,10 +15,6 @@ from pyspark.sql.types import StructType, StructField, StringType, BooleanType, 
 # Set up a logger
 logger = get_logger(__name__, "DEBUG")
 
-# Function to get schema from table
-def get_schema_from_table(spark, table_name):
-    return spark.read.table(table_name).schema
-
 @dataclass
 class ABTestConfig:
     """
@@ -58,6 +54,15 @@ class ABTestDeltaTables:
         self.spark = spark
         self.dbutils = dbutils
         self.config = config
+
+    def get_schema_from_table(self, table_name: str) -> StructType:
+        """
+        Retrieve the schema from a specified table.
+        
+        :param table_name: Name of the table from which to retrieve the schema.
+        :return: The schema as a StructType object.
+        """
+        return self.spark.read.table(table_name).schema
 
     def compare_schemas(self, before_table, after_table):
         """
@@ -134,7 +139,7 @@ class ABTestDeltaTables:
         comparison_df.show(10)
 
         # Get the schema from the result table
-        ab_final_result_schema = get_schema_from_table(self.spark, "ab_final_result")
+        ab_final_result_schema = self.get_schema_from_table("ab_final_result")
 
         # Prepare data for ab_final_result table
         results = []
