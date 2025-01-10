@@ -33,13 +33,11 @@ class ABTestConfig:
     table_a: str
     post_fix: str
     result_table: str
-    key_columns: List[str]
 
-    def __init__(self, table_a, post_fix, result_table, key_columns):
+    def __init__(self, table_a, post_fix, result_table):
         self.table_a = table_a
         self.post_fix = post_fix
         self.result_table = result_table
-        self.key_columns = key_columns
 
 
 class ABTestDeltaTables:
@@ -88,10 +86,10 @@ class ABTestDeltaTables:
         for col, new_col in renamed_columns_b.items():
             df_b = df_b.withColumnRenamed(col, new_col)
 
-        # Create join condition based on key columns
+        # Create join condition based on all columns
         join_condition = [
             df_a[f"{col}_a"] == df_b[f"{col}_b"]
-            for col in self.config.key_columns
+            for col in df_a.columns if col.endswith("_a")
         ]
 
         joined_df = df_a.join(df_b, join_condition, "outer").select(
