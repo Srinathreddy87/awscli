@@ -6,9 +6,11 @@ schema comparison and row-by-row data validation.
 
 import logging
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 import src.domain_reference as dr
 from SRC.logging_setup import get_logger
+from SRC.ab_final_result_ddl import ab_final_result_schema  # Import the schema
+from datetime import datetime
 
 # Set up a logger
 logger = get_logger(__name__, "DEBUG")
@@ -128,16 +130,51 @@ class ABTestDeltaTables:
 
         comparison_df = self.spark.sql(comparison_query)
 
-        # Write the comparison results to the result table
+        # Debugging: Show the schema and first few rows of the DataFrame
+        comparison_df.printSchema()
+        comparison_df.show(10)
+
+        # Prepare data for ab_final_result table
+        results = []
+        run_date = datetime.now()  # Current run date and time
+        for col in renamed_columns_a.keys():
+            mismatch_count = comparison_df.filter(
+                comparison_df[f"{col.replace('_a', '')}_result"] == 'unmatch'
+            ).count()
+            results.append({
+                "test_name": "ABTest",  # You can parameterize this
+                "table_a": before_table,
+                "table_b": after_table,
+                "column_name": col.replace('_a', ''),
+                "schema_mismatch": col not in renamed_columns_b,
+                "data_mismatch": mismatch_count > 0,
+                "mismatch_count": mismatch_count,
+                "validation_errors": None,  # Add more detailed error messages if needed
+                "run_date": run_date  # Add run_date to results
+            })
+
+        results_df = self.spark.createDataFrame(results, ab_final_result_schema)
+
+        # Write the comparison results to the ab_final_result table
+        try:
+            results_df.write.format("delta").mode("append")\
+                .saveAsTable("ab_final_result")
+            logger.info(
+                "Data validation complete. Comparison results stored in table: ab_final_result"
+            )
+        except Exception as e:
+            logger.error("Failed to save comparison results: %s", e)
+
+        # Save the full comparison result DataFrame to the result_table
         try:
             comparison_df.write.format("delta").mode("overwrite")\
                 .saveAsTable(self.config.result_table)
             logger.info(
-                "Data validation complete. Comparison results stored in table: %s",
+                "Full comparison results stored in table: %s",
                 self.config.result_table,
             )
         except Exception as e:
-            logger.error("Failed to save comparison results: %s", e)
+            logger.error("Failed to save full comparison results: %s", e)
 
     def _get_table_config(self, table_a: str):
         """
@@ -147,8 +184,7 @@ class ABTestDeltaTables:
         :return: The config of the table.
         """
         domain_ref = dr.Domainreference(self.spark, self.dbutils)
-        table_config = domain_ref.get_table_config(table_a)
-        return table_config
+        return domain_ref.get_table_config(table_a)
 
     def table_b_table_path(self, table_config, before_table, post_fix):
         """
@@ -158,7 +194,8 @@ class ABTestDeltaTables:
         if post_fix == "feature":
             table_b = stage_path.replace("_stage", "")
             return f"{before_table}_{post_fix}"
-            
+        return stage_path
+
     def _parse_table_settings(self, table):
         """
         Parse table settings and derive before_table and after_table.
@@ -167,7 +204,7 @@ class ABTestDeltaTables:
         post_fix = next(
             (opt["post_fix"] for opt in table.get("options", []) 
              if "post_fix" in opt),
-            ""
+            "",
         )
         # Derive result_table
         result_table = table_a + "_ab_comparison_result"
