@@ -147,10 +147,13 @@ class ABTestDeltaTables:
         comparison_df.printSchema()
         comparison_df.show(10)
 
-        # Get the schema from the result table
-        ab_final_result_schema = self.get_schema_from_table(before_table)
+        # Derive the audit table name
+        audit_table_name = f"{before_table.rsplit('.', 1)[0]}.sparta_audit_result"
 
-        # Prepare data for ab_final_result table
+        # Get the schema from the audit table
+        ab_final_result_schema = self.get_schema_from_table(audit_table_name)
+
+        # Prepare data for the audit table
         results = []
         run_date = datetime.now()  # Current run date and time
         for col in renamed_columns_a.keys():
@@ -171,12 +174,13 @@ class ABTestDeltaTables:
 
         results_df = self.spark.createDataFrame(results, ab_final_result_schema)
 
-        # Write the comparison results to the ab_final_result table
+        # Write the comparison results to the audit table
         try:
             results_df.write.format("delta").mode("append")\
-                .saveAsTable("ab_final_result")
+                .saveAsTable(audit_table_name)
             logger.info(
-                "Data validation complete. Comparison results stored in table: ab_final_result"
+                "Data validation complete. Comparison results stored in table: %s",
+                audit_table_name
             )
         except Exception as e:
             logger.error("Failed to save comparison results: %s", e)
