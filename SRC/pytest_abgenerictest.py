@@ -26,9 +26,9 @@ def ab_test_config():
     Fixture for creating the ABTestConfig object.
     """
     return ABTestConfig(
-        table_a="en_poc_dev.sparta_works.sparta_dev",
+        table_a="en_poc_dev.sparta_works.user_data",
         post_fix="feature",
-        result_table="ab_test_result",
+        result_table="en_poc_dev.sparta_works.user_data_ab_testresults",
     )
 
 
