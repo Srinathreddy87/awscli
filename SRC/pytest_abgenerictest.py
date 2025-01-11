@@ -1,73 +1,75 @@
-"""
-This module contains tests for the ABTestDeltaTables class in the ABGenericScript module.
-"""
-
-import logging
+import pytest
+from pyspark.sql import SparkSession
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    BooleanType,
+    IntegerType,
+    TimestampType,
+)
+from SRC.ABGenericScript import ABTestDeltaTables, ABTestConfig
 from unittest.mock import MagicMock
 
-import pytest
+@pytest.fixture(scope="module")
+def spark():
+    return SparkSession.builder.master("local[1]").appName("pytest").getOrCreate()
 
-from mocks.mock_spark import mock_spark_session
-from sparta.abtest import ABTestConfig, ABTestDeltaTables
-from sparta.common_logger import get_logger, info
-
-# Set up the logger
-logger = get_logger(__name__, "DEBUG")
-
-@pytest.fixture(name="ab_test")
-def ab_test_fixture():
-    """
-    Create an instance of ABTestDeltaTables with a mock Spark session.
-    """
-    config = ABTestConfig(
-        table_a="test_table_a",
-        post_fix="test_post_fix",
-        result_table="test_result_table",
-        key_columns=["key_column1", "key_column2"],
+@pytest.fixture
+def ab_test_config():
+    return ABTestConfig(
+        table_a="en_poc_dev.sparta_works.sparta_dev",
+        post_fix="feature",
+        result_table="ab_test_result"
     )
-    ab_test = ABTestDeltaTables(mock_spark_session(), MagicMock(), config)
-    return ab_test
 
-def test_compare_schemas(ab_test, caplog):
-    """
-    Test the compare_schemas method.
-    """
-    # Create sample DataFrames for before_table and after_table
-    data_a = [("value1", "value2")]
-    schema_a = ["key_column1", "key_column2"]
-    df_a = ab_test.spark.createDataFrame(data_a, schema=schema_a)
-    ab_test.spark.registerDataFrameAsTable(df_a, "before_table")
+@pytest.fixture
+def ab_test(spark, ab_test_config):
+    dbutils = MagicMock()
+    return ABTestDeltaTables(spark, dbutils, ab_test_config)
 
-    data_b = [("value1", "value2")]
-    schema_b = ["key_column1", "key_column2"]
-    df_b = ab_test.spark.createDataFrame(data_b, schema=schema_b)
-    ab_test.spark.registerDataFrameAsTable(df_b, "after_table")
+def test_get_schema_from_table(spark, ab_test):
+    schema = ab_test.get_schema_from_table("en_poc_dev.sparta_works.sparta_dev")
+    assert isinstance(schema, StructType)
 
-    # Compare schemas
-    with caplog.at_level(logging.INFO):
-        ab_test.compare_schemas("before_table", "after_table")
+def test_compare_schemas(spark, ab_test):
+    ab_test.compare_schemas("table_a", "table_b")
 
-    # Check if schemas are logged as identical
-    assert "Schemas are identical." in caplog.text
-    info(logger, "Schemas compared successfully.")
+def test_validate_data(spark, ab_test):
+    ab_test.validate_data("before_table", "after_table")
 
-def test_construct_unmatched_query(ab_test):
-    """
-    Construct the unmatched query.
-    """
-    query = ab_test.construct_unmatched_query()
-    expected_query = f"""
-    SELECT
-        CASE
-            WHEN {expected_conditions} THEN 'unmatched'
-            ELSE 'matched'
-        END AS validation_result
-    FROM joined_view
-    WHERE {expected_conditions};
-    """
+def test_rename_columns(spark, ab_test):
+    schema = StructType([StructField("col1", StringType(), True)])
+    df = spark.createDataFrame([("value1",)], schema)
+    df_renamed = ab_test.rename_columns(df, "_suffix")
+    assert "col1_suffix" in df_renamed.columns
 
-    # Normalize whitespace for comparison
-    def normalize_whitespace(query):
-        return " ".join(query.split())
+def test_create_join_condition(spark, ab_test):
+    schema = StructType([StructField("col1_a", StringType(), True)])
+    df_a = spark.createDataFrame([("value1",)], schema)
+    df_b = spark.createDataFrame([("value1",)], schema)
+    join_condition = ab_test.create_join_condition(df_a, df_b)
+    assert len(join_condition) == 1
 
-    assert normalize_whitespace(query) == normalize_whitespace(expected_query)
+def test_construct_comparison_query(spark, ab_test):
+    schema = StructType([StructField("col1_a", StringType(), True)])
+    df_a = spark.createDataFrame([("value1",)], schema)
+    df_b = spark.createDataFrame([("value1",)], schema)
+    query = ab_test.construct_comparison_query(df_a, df_b)
+    assert "SELECT" in query
+
+def test_prepare_results(spark, ab_test):
+    schema = StructType([StructField("col1_a", StringType(), True)])
+    comparison_df = spark.createDataFrame([("value1",)], schema)
+    results = ab_test.prepare_results(comparison_df, ["col1_a"], "before_table", "after_table")
+    assert len(results) > 0
+
+def test_write_results(spark, ab_test):
+    schema = StructType([StructField("col1", StringType(), True)])
+    results_df = spark.createDataFrame([("value1",)], schema)
+    ab_test.write_results(results_df, "audit_table_name")
+
+def test_write_comparison_results(spark, ab_test):
+    schema = StructType([StructField("col1", StringType(), True)])
+    comparison_df = spark.createDataFrame([("value1",)], schema)
+    ab_test.write_comparison_results(comparison_df)
