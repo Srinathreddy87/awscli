@@ -26,9 +26,9 @@ def ab_test_config():
     Fixture for creating the ABTestConfig object.
     """
     return ABTestConfig(
-        table_a="en_poc_dev.sparta_works.user_data",
+        table_a="catalog.schema.table_a",
         post_fix="feature",
-        result_table="en_poc_dev.sparta_works.user_data_ab_testresults",
+        result_table="catalog.schema.ab_test_result",
     )
 
 
@@ -45,7 +45,8 @@ def test_get_schema_from_table(spark, ab_test):
     """
     Test the get_schema_from_table method.
     """
-    schema = ab_test.get_schema_from_table("en_poc_dev.sparta_works.sparta_dev")
+    table_name = "catalog.schema.table"  # Adjust this to a valid table name
+    schema = ab_test.get_schema_from_table(table_name)
     assert isinstance(schema, StructType)
 
 
@@ -53,14 +54,14 @@ def test_compare_schemas(spark, ab_test):
     """
     Test the compare_schemas method.
     """
-    ab_test.compare_schemas("table_a", "table_b")
+    ab_test.compare_schemas("catalog.schema.table_a", "catalog.schema.table_b")
 
 
 def test_validate_data(spark, ab_test):
     """
     Test the validate_data method.
     """
-    ab_test.validate_data("before_table", "after_table")
+    ab_test.validate_data("catalog.schema.before_table", "catalog.schema.after_table")
 
 
 def test_rename_columns(spark, ab_test):
@@ -102,7 +103,7 @@ def test_prepare_results(spark, ab_test):
     schema = StructType([StructField("col1_a", StringType(), True)])
     comparison_df = spark.createDataFrame([("value1",)], schema)
     results = ab_test.prepare_results(
-        comparison_df, ["col1_a"], "before_table", "after_table"
+        comparison_df, ["col1_a"], "catalog.schema.before_table", "catalog.schema.after_table"
     )
     assert len(results) > 0
 
@@ -113,7 +114,7 @@ def test_write_results(spark, ab_test):
     """
     schema = StructType([StructField("col1", StringType(), True)])
     results_df = spark.createDataFrame([("value1",)], schema)
-    ab_test.write_results(results_df, "audit_table_name")
+    ab_test.write_results(results_df, "catalog.schema.audit_table_name")
 
 
 def test_write_comparison_results(spark, ab_test):
