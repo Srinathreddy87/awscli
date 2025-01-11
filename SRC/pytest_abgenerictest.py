@@ -1,5 +1,4 @@
 import pytest
-from pyspark.sql import SparkSession
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -10,10 +9,11 @@ from pyspark.sql.types import (
 )
 from SRC.ABGenericScript import ABTestDeltaTables, ABTestConfig
 from unittest.mock import MagicMock
+from mocks.mock_spark import mock_spark_session
 
 @pytest.fixture(scope="module")
 def spark():
-    return SparkSession.builder.master("local[1]").appName("pytest").getOrCreate()
+    return mock_spark_session
 
 @pytest.fixture
 def ab_test_config():
