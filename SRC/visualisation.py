@@ -8,41 +8,55 @@ def read_table(spark, table_name):
     """
     return spark.read.table(table_name).toPandas()
 
-def plot_bar_chart(df):
+def validate_columns(df):
     """
-    Plot a bar chart of mismatched records grouped by test_name.
+    Validate columns for each unique test_name and return mismatched records.
     """
-    # Filter for mismatched records
-    mismatched_df = df[df['data_mismatch'] == True]
+    mismatches = []
     
-    # Group by test_name and count mismatches
-    grouped_df = mismatched_df.groupby('test_name').size().reset_index(name='mismatch_count')
+    for test_name, group in df.groupby('test_name'):
+        # Check for mismatches in each column
+        for column in df.columns:
+            if column != 'test_name':
+                unique_values = group[column].unique()
+                if len(unique_values) > 1:
+                    mismatches.append({
+                        'test_name': test_name,
+                        'column': column,
+                        'values': unique_values
+                    })
     
+    return pd.DataFrame(mismatches)
+
+def plot_mismatches(df):
+    """
+    Plot mismatches as a bar chart and a table.
+    """
+    if df.empty:
+        print("No mismatches found.")
+        return
+
+    # Bar chart for mismatch count per test_name
+    counts = df['test_name'].value_counts().reset_index(name='count')
     plt.figure(figsize=(10, 6))
-    plt.bar(grouped_df['test_name'], grouped_df['mismatch_count'], color='skyblue')
+    plt.bar(counts['index'], counts['count'], color='skyblue')
     plt.xlabel('Test Name')
     plt.ylabel('Mismatch Count')
-    plt.title('Bar Chart of Data Mismatches by Test Name')
+    plt.title('Mismatch Count by Test Name')
     plt.xticks(rotation=45)
     plt.show()
 
-def plot_table(df):
-    """
-    Plot a DataFrame as a table.
-    """
-    # Filter for mismatched records
-    mismatched_df = df[df['data_mismatch'] == True]
-    
+    # Table for detailed mismatches
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.axis('tight')
     ax.axis('off')
-    table = ax.table(cellText=mismatched_df.values, colLabels=mismatched_df.columns, cellLoc='center', loc='center')
-    plt.title('Table of Data Mismatches by Test Name')
+    table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
+    plt.title('Detailed Mismatches')
     plt.show()
 
 def main():
     """
-    Main function to read a table and create visualizations.
+    Main function to read a table, validate columns, and create visualizations.
     """
     # Use the existing Spark session (Databricks automatically provides a Spark session)
     spark = SparkSession.builder.getOrCreate()
@@ -53,11 +67,11 @@ def main():
     # Print columns for debugging
     print("DataFrame Columns:", df.columns)
 
-    # Plot bar chart of mismatched records grouped by test_name
-    plot_bar_chart(df)
+    # Validate columns and get mismatches
+    mismatches_df = validate_columns(df)
 
-    # Plot the DataFrame as a table
-    plot_table(df)
+    # Plot mismatches
+    plot_mismatches(mismatches_df)
 
 if __name__ == "__main__":
     main()
