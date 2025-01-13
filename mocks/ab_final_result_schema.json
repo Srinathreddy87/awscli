@@ -57,3 +57,11 @@
         }
     ]
 }
+
+
+INSERT INTO spart_ab_audit_test (test_name, table_a, table_b, column_name, schema_mismatch, data_mismatch, mismatch_count, validation_errors, run_date) VALUES 
+('Test1', 'table_a1', 'table_b1', 'column1', true, false, 0, 'No errors', '2025-01-13 00:00:00'),
+('Test2', 'table_a2', 'table_b2', 'column2', false, true, 3, 'Data mismatch in 3 rows', '2025-01-12 00:00:00'),
+('Test3', 'table_a3', 'table_b3', 'column3', true, true, 5, 'Schema and data mismatch', '2025-01-11 00:00:00'),
+('Test4', 'table_a4', 'table_b4', 'column4', false, false, 0, 'No errors', '2025-01-10 00:00:00'),
+('Test5', 'table_a5', 'table_b5', 'column5', true, false, 2, 'Schema mismatch in 2 columns', '2025-01-09 00:00:00');
