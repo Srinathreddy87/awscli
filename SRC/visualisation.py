@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import pandas as pd
+from pyspark.sql import SparkSession
 
 def read_table(spark, table_name):
     """
@@ -6,39 +8,51 @@ def read_table(spark, table_name):
     """
     return spark.read.table(table_name).toPandas()
 
-def plot_data(df, column):
+def plot_bar_chart(df):
     """
-    Plot a column of the DataFrame.
+    Plot a bar chart of unique records grouped by test_name.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' does not exist in DataFrame. Available columns: {df.columns.tolist()}")
-    
+    grouped_df = df.groupby('test_name').size().reset_index(name='counts')
     plt.figure(figsize=(10, 6))
-    plt.plot(df[column])
-    plt.title(f'Plot of {column}')
-    plt.xlabel('Index')
-    plt.ylabel(column)
+    plt.bar(grouped_df['test_name'], grouped_df['counts'], color='skyblue')
+    plt.xlabel('Test Name')
+    plt.ylabel('Counts')
+    plt.title('Bar Chart of Unique Records by Test Name')
+    plt.xticks(rotation=45)
+    plt.show()
+
+def plot_table(df):
+    """
+    Plot a DataFrame as a table.
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.axis('tight')
+    ax.axis('off')
+    table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
+    plt.title('Table of Unique Records by Test Name')
     plt.show()
 
 def main():
     """
-    Main function to read a table and plot data.
+    Main function to read a table and create visualizations.
     """
     # Use the existing Spark session (Databricks automatically provides a Spark session)
     spark = SparkSession.builder.getOrCreate()
 
-    table_name = 'catalog.schema.table_name'  # Adjust this to the actual table name
+    table_name = 'spart_ab_audit_test'  # Adjust this to the actual table name
     df = read_table(spark, table_name)
-    
+
     # Print columns for debugging
     print("DataFrame Columns:", df.columns)
-    
-    # Dynamically use the first column from the DataFrame for plotting
-    first_column = df.columns[0]
-    print(f"Using column '{first_column}' for plotting")
-    
-    # Plot data using the first column
-    plot_data(df, first_column)
+
+    # Group the DataFrame by test_name and get unique records
+    unique_records_df = df.drop_duplicates(subset=['test_name'])
+
+    # Plot bar chart of unique records grouped by test_name
+    plot_bar_chart(unique_records_df)
+
+    # Plot the DataFrame as a table
+    plot_table(unique_records_df)
 
 if __name__ == "__main__":
     main()
