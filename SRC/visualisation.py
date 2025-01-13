@@ -10,14 +10,19 @@ def read_table(spark, table_name):
 
 def plot_bar_chart(df):
     """
-    Plot a bar chart of unique records grouped by test_name.
+    Plot a bar chart of mismatched records grouped by test_name.
     """
-    grouped_df = df.groupby('test_name').size().reset_index(name='counts')
+    # Filter for mismatched records
+    mismatched_df = df[df['data_mismatch'] == True]
+    
+    # Group by test_name and count mismatches
+    grouped_df = mismatched_df.groupby('test_name').size().reset_index(name='mismatch_count')
+    
     plt.figure(figsize=(10, 6))
-    plt.bar(grouped_df['test_name'], grouped_df['counts'], color='skyblue')
+    plt.bar(grouped_df['test_name'], grouped_df['mismatch_count'], color='skyblue')
     plt.xlabel('Test Name')
-    plt.ylabel('Counts')
-    plt.title('Bar Chart of Unique Records by Test Name')
+    plt.ylabel('Mismatch Count')
+    plt.title('Bar Chart of Data Mismatches by Test Name')
     plt.xticks(rotation=45)
     plt.show()
 
@@ -25,11 +30,14 @@ def plot_table(df):
     """
     Plot a DataFrame as a table.
     """
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # Filter for mismatched records
+    mismatched_df = df[df['data_mismatch'] == True]
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
     ax.axis('tight')
     ax.axis('off')
-    table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
-    plt.title('Table of Unique Records by Test Name')
+    table = ax.table(cellText=mismatched_df.values, colLabels=mismatched_df.columns, cellLoc='center', loc='center')
+    plt.title('Table of Data Mismatches by Test Name')
     plt.show()
 
 def main():
@@ -45,14 +53,11 @@ def main():
     # Print columns for debugging
     print("DataFrame Columns:", df.columns)
 
-    # Group the DataFrame by test_name and get unique records
-    unique_records_df = df.drop_duplicates(subset=['test_name'])
-
-    # Plot bar chart of unique records grouped by test_name
-    plot_bar_chart(unique_records_df)
+    # Plot bar chart of mismatched records grouped by test_name
+    plot_bar_chart(df)
 
     # Plot the DataFrame as a table
-    plot_table(unique_records_df)
+    plot_table(df)
 
 if __name__ == "__main__":
     main()
