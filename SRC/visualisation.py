@@ -15,16 +15,19 @@ def validate_columns(df):
     mismatches = []
     
     for test_name, group in df.groupby('test_name'):
-        # Check for mismatches in each column
-        for column in df.columns:
-            if column != 'test_name':
-                unique_values = group[column].unique()
-                if len(unique_values) > 1:
-                    mismatches.append({
-                        'test_name': test_name,
-                        'column': column,
-                        'values': unique_values
-                    })
+        for index, row in group.iterrows():
+            if row['schema_mismatch'] or row['data_mismatch'] or row['mismatch_count'] > 0 or row['validation_errors'] != 'No errors':
+                mismatches.append({
+                    'test_name': row['test_name'],
+                    'table_a': row['table_a'],
+                    'table_b': row['table_b'],
+                    'column_name': row['column_name'],
+                    'schema_mismatch': row['schema_mismatch'],
+                    'data_mismatch': row['data_mismatch'],
+                    'mismatch_count': row['mismatch_count'],
+                    'validation_errors': row['validation_errors'],
+                    'run_date': row['run_date']
+                })
     
     return pd.DataFrame(mismatches)
 
