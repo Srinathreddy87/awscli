@@ -1,13 +1,10 @@
-from pyspark.sql import SparkSession
 import matplotlib.pyplot as plt
-
 
 def read_table(spark, table_name):
     """
     Read data from a Spark table.
     """
     return spark.read.table(table_name).toPandas()
-
 
 def plot_data(df, column):
     """
@@ -23,10 +20,12 @@ def plot_data(df, column):
     plt.ylabel(column)
     plt.show()
 
-
 def main():
-    # Initialize Spark session
-    spark = SparkSession.builder.appName("Visualisation").getOrCreate()
+    """
+    Main function to read a table and plot data.
+    """
+    # Use the existing Spark session (Databricks automatically provides a Spark session)
+    spark = SparkSession.builder.getOrCreate()
 
     table_name = 'catalog.schema.table_name'  # Adjust this to the actual table name
     df = read_table(spark, table_name)
@@ -34,12 +33,12 @@ def main():
     # Print columns for debugging
     print("DataFrame Columns:", df.columns)
     
-    # Use a valid column name from the DataFrame
-    plot_data(df, 'valid_column_name')  # Replace 'valid_column_name' with an actual column name from the DataFrame
-
-    # Stop the Spark session
-    spark.stop()
-
+    # Dynamically use the first column from the DataFrame for plotting
+    first_column = df.columns[0]
+    print(f"Using column '{first_column}' for plotting")
+    
+    # Plot data using the first column
+    plot_data(df, first_column)
 
 if __name__ == "__main__":
     main()
