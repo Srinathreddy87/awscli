@@ -8,9 +8,9 @@ def read_table(spark, table_name):
     """
     return spark.read.table(table_name).toPandas()
 
-def validate_columns(df):
+def identify_mismatches(df):
     """
-    Validate columns for each unique test_name and return mismatched records.
+    Identify mismatches for each unique test_name and return mismatched records.
     """
     mismatches = []
     
@@ -59,7 +59,7 @@ def plot_mismatches(df):
 
 def main():
     """
-    Main function to read a table, validate columns, and create visualizations.
+    Main function to read a table, identify mismatches, and create visualizations.
     """
     # Use the existing Spark session (Databricks automatically provides a Spark session)
     spark = SparkSession.builder.getOrCreate()
@@ -70,8 +70,8 @@ def main():
     # Print columns for debugging
     print("DataFrame Columns:", df.columns)
 
-    # Validate columns and get mismatches
-    mismatches_df = validate_columns(df)
+    # Identify mismatches and get mismatched records
+    mismatches_df = identify_mismatches(df)
 
     # Plot mismatches
     plot_mismatches(mismatches_df)
