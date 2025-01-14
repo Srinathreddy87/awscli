@@ -77,14 +77,22 @@ def plot_mismatches(df):
 
     # Plot schema mismatches
     if not schema_mismatches.empty:
-        counts = schema_mismatches["test_name"].value_counts().reset_index(
-            name="count"
+        schema_counts = (
+            schema_mismatches.groupby("test_name")[["table_a", "table_b"]]
+            .first()
+            .reset_index()
         )
+        schema_counts["tables"] = (
+            schema_counts["table_a"] + " / " + schema_counts["table_b"]
+        )
+
         plt.figure(figsize=(10, 6))
-        plt.bar(counts["index"], counts["count"], color="orange")
+        plt.bar(
+            schema_counts["test_name"], schema_counts["tables"], color="orange"
+        )
         plt.xlabel("Test Name")
-        plt.ylabel("Schema Mismatch Count")
-        plt.title("Schema Mismatch Count by Test Name")
+        plt.ylabel("Tables")
+        plt.title("Schema Mismatch Tables by Test Name")
         plt.xticks(rotation=45)
         plt.show()
 
@@ -103,14 +111,20 @@ def plot_mismatches(df):
 
     # Plot data mismatches
     if not data_mismatches.empty:
-        counts = data_mismatches["test_name"].value_counts().reset_index(
-            name="count"
+        data_counts = (
+            data_mismatches.groupby("test_name")[["table_a", "table_b"]]
+            .first()
+            .reset_index()
         )
+        data_counts["tables"] = (
+            data_counts["table_a"] + " / " + data_counts["table_b"]
+        )
+
         plt.figure(figsize=(10, 6))
-        plt.bar(counts["index"], counts["count"], color="red")
+        plt.bar(data_counts["test_name"], data_counts["tables"], color="red")
         plt.xlabel("Test Name")
-        plt.ylabel("Data Mismatch Count")
-        plt.title("Data Mismatch Count by Test Name")
+        plt.ylabel("Tables")
+        plt.title("Data Mismatch Tables by Test Name")
         plt.xticks(rotation=45)
         plt.show()
 
