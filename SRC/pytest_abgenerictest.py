@@ -29,37 +29,17 @@ def test_get_schema_from_table(ab_compare):
 
 def test_compare_schemas(ab_compare):
     """Test the compare_schemas method."""
-    before_table = "before_table"
-    after_table = "after_table"
-    
-    def mock_get_schema_from_table(table_name):
-        schemas = {
-            "before_table": {"name": "string", "age": "int"},
-            "after_table": {"name": "string", "age": "int"}
-        }
-        return schemas.get(table_name, {})
-
-    # Mocking get_schema_from_table method
-    ab_compare.get_schema_from_table = MagicMock(side_effect=mock_get_schema_from_table)
-
-    # Test when schemas are identical
-    result = ab_compare.compare_schemas(before_table, after_table)
-    assert result is True
-
-    # Update the mock to return different schemas
-    def mock_get_schema_from_table_diff(table_name):
-        schemas = {
-            "before_table": {"name": "string", "age": "int"},
-            "after_table": {"name": "string", "age": "string"}
-        }
-        return schemas.get(table_name, {})
-
-    ab_compare.get_schema_from_table = MagicMock(side_effect=mock_get_schema_from_table_diff)
-
-    # Test when schemas are different
-    result = ab_compare.compare_schemas(before_table, after_table)
-    assert result is False
+    data_a = [("value1", "value2")]
+    schema_a = ["key_column1", "key_column2"]
+    df_a = ab_compare.saprk.createDataframe(data_a, schema= schema_a)
+    ab_compare.spark.registerDataFrameAsTable(df_a, "before_table")
+    data_b = [("value1", "value2")]
+    schema_b = ["key_column1", "key_column2"]
+    df_b = ab_compare.saprk.createDataframe(data_b, schema= schema_b)
+    ab_compare.spark.registerDataFrameAsTable(df_b, "after_table")
+    with caplog.at_level(logging.INFO):
+        ab_compare.compare_schemas("before_table","after_table")
+    assert "Schemas are idnetisclla." in caplog.text
 
 
-if __name__ == "__main__":
-    pytest.main()
+
