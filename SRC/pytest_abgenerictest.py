@@ -1,11 +1,9 @@
-# SRC/pytest_abgenerictest.py
+# awscli/SRC/pytest_abgenerictest.py
 
 import pytest
 from unittest.mock import MagicMock
-from SRC.mocks.mock_spark import MockSparkSession, MockDataFrame
-
-# Import your ABGenericScript module here
-from SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
+from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
+from awscli.SRC.mocks.mock_spark import MockSparkSession
 
 
 @pytest.fixture(name="ab_compare")
@@ -24,23 +22,33 @@ def ab_compare_fixture():
 def test_get_schema_from_table(ab_compare):
     """Test the get_schema_from_table method."""
     table_name = "test_table"
-    ab_compare.get_schema_from_table = MagicMock(
-        return_value="database.schema"
-    )
+    ab_compare.get_schema_from_table = MagicMock(return_value="database.schema")
     result = ab_compare.get_schema_from_table(table_name)
     assert result == "database.schema"
 
 
-def test_compare_schema(ab_compare):
-    """Test the compare_schema method."""
-    schema1 = {"name": "string", "age": "int"}
-    schema2 = {"name": "string", "age": "int"}
-    schema3 = {"name": "string", "age": "string"}
+def test_compare_schemas(ab_compare):
+    """Test the compare_schemas method."""
+    before_table = "before_table"
+    after_table = "after_table"
+    
+    ab_compare.get_schema_from_table = MagicMock()
+    ab_compare.get_schema_from_table.side_effect = lambda table_name: {
+        "before_table": {"name": "string", "age": "int"},
+        "after_table": {"name": "string", "age": "int"}
+    }[table_name]
 
-    ab_compare.compare_schema = MagicMock(side_effect=lambda s1, s2: s1 == s2)
+    result = ab_compare.compare_schemas(before_table, after_table)
+    assert result is True
 
-    result1 = ab_compare.compare_schema(schema1, schema2)
-    result2 = ab_compare.compare_schema(schema1, schema3)
+    ab_compare.get_schema_from_table.side_effect = lambda table_name: {
+        "before_table": {"name": "string", "age": "int"},
+        "after_table": {"name": "string", "age": "string"}
+    }[table_name]
 
-    assert result1 is True
-    assert result2 is False
+    result = ab_compare.compare_schemas(before_table, after_table)
+    assert result is False
+
+
+if __name__ == "__main__":
+    pytest.main()
