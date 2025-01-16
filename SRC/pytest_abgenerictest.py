@@ -32,20 +32,31 @@ def test_compare_schemas(ab_compare):
     before_table = "before_table"
     after_table = "after_table"
     
-    ab_compare.get_schema_from_table = MagicMock()
-    ab_compare.get_schema_from_table.side_effect = lambda table_name: {
-        "before_table": {"name": "string", "age": "int"},
-        "after_table": {"name": "string", "age": "int"}
-    }[table_name]
+    def mock_get_schema_from_table(table_name):
+        schemas = {
+            "before_table": {"name": "string", "age": "int"},
+            "after_table": {"name": "string", "age": "int"}
+        }
+        return schemas.get(table_name, {})
 
+    # Mocking get_schema_from_table method
+    ab_compare.get_schema_from_table = MagicMock(side_effect=mock_get_schema_from_table)
+
+    # Test when schemas are identical
     result = ab_compare.compare_schemas(before_table, after_table)
     assert result is True
 
-    ab_compare.get_schema_from_table.side_effect = lambda table_name: {
-        "before_table": {"name": "string", "age": "int"},
-        "after_table": {"name": "string", "age": "string"}
-    }[table_name]
+    # Update the mock to return different schemas
+    def mock_get_schema_from_table_diff(table_name):
+        schemas = {
+            "before_table": {"name": "string", "age": "int"},
+            "after_table": {"name": "string", "age": "string"}
+        }
+        return schemas.get(table_name, {})
 
+    ab_compare.get_schema_from_table = MagicMock(side_effect=mock_get_schema_from_table_diff)
+
+    # Test when schemas are different
     result = ab_compare.compare_schemas(before_table, after_table)
     assert result is False
 
