@@ -49,3 +49,24 @@ def test_compare_schemas(ab_compare, caplog):
 
 if __name__ == "__main__":
     pytest.main()
+
+
+# In awscli/SRC/mocks/mock_spark.py
+
+class MockDataFrame:
+    def __init__(self, data, schema):
+        self.data = data
+        self.schema = schema
+    
+    def createOrReplaceTempView(self, name):
+        """Mock method for createOrReplaceTempView"""
+        print(f"Mock createOrReplaceTempView called with name: {name}")
+
+class MockSparkSession:
+    def createDataFrame(self, data, schema):
+        """Mock method for createDataFrame"""
+        return MockDataFrame(data, schema)
+
+    def registerDataFrameAsTable(self, df, name):
+        """Mock method for registerDataFrameAsTable"""
+        df.createOrReplaceTempView(name)
