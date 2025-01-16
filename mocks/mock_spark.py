@@ -103,5 +103,6 @@ def test_construct_unmatched_query(ab_test):
     info(logger, "Unmatched query constructed successfully.")
 
 
-if __name__ == "__main__":
-    pytest.main()
+def mock_saprk_session():
+    """Create a Mock Spark Session"""
+    retrun MockSparkSession()
