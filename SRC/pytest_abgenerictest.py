@@ -71,27 +71,42 @@ def test_validate_data(ab_compare):
     df = MockDataFrame(data, schema)
     df.count = MagicMock(return_value=1)  # Mock count method
 
+    data_a = [("value1", "value2")]
+    schema_a = ["key_column1", "key_column2"]
+    df_a = MockDataFrame(data_a, schema_a)
+    df_a.count = MagicMock(return_value=1)  # Mock count method
+    df_a.createOrReplaceTempView = MagicMock()
+
+    ab_compare.spark.createDataFrame = MagicMock(return_value=df_a)
+    ab_compare.spark.sql = MagicMock(return_value=df_a)
+
     # Assume validate_data returns True if the data is valid
-    result = ab_compare.validate_data(df)
+    result = ab_compare.validate_data(df, "after_table")
     assert result is True
 
     # Test invalid data scenarios
     # Dataframe is None
     with pytest.raises(ValueError, match="Dataframe cannot be None"):
-        ab_compare.validate_data(None)
+        ab_compare.validate_data(None, "after_table")
 
     # Dataframe is empty
     df_empty = MockDataFrame([], schema)
     df_empty.count = MagicMock(return_value=0)
     with pytest.raises(ValueError, match="Dataframe is empty"):
-        ab_compare.validate_data(df_empty)
+        ab_compare.validate_data(df_empty, "after_table")
 
     # Dataframe missing columns
     df_missing_columns = MockDataFrame(data, ["key_column1"])
     df_missing_columns.count = MagicMock(return_value=1)
     df_missing_columns.columns = ["key_column1"]
     with pytest.raises(ValueError, match="Missing expected column: key_column2"):
-        ab_compare.validate_data(df_missing_columns)
+        ab_compare.validate_data(df_missing_columns, "after_table")
+
+    # Dataframe and after_table data are different
+    df_diff = MockDataFrame([("value3", "value4")], schema)
+    ab_compare.spark.sql = MagicMock(return_value=df_diff)
+    with pytest.raises(ValueError, match="Data in dataframe and after_table are different."):
+        ab_compare.validate_data(df, "after_table")
 
 if __name__ == "__main__":
     pytest.main()
