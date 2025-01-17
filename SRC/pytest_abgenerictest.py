@@ -1,4 +1,11 @@
-import pytest
+    def select(self, *cols):
+        """Mock method for select"""
+        selected_columns = [col.split(".")[1] if "." in col else col for col in cols]
+        selected_data = self.data[selected_columns]
+        return MockDataFrame(selected_data)
+
+--------
+ import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
 from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
@@ -30,6 +37,10 @@ def test_validate_data(ab_compare):
     ab_compare.spark.createDataFrame = MagicMock(return_value=df_a)
     with patch.object(ab_compare.spark.read, 'format', return_value=MagicMock()) as mock_format:
         mock_format.return_value.table.return_value = df_a
+
+        # Debugging: Print column names to verify
+        print("Columns in df:", df.columns)
+        print("Columns in df_a:", df_a.columns)
 
         # Assume validate_data returns True if the data is valid
         result = ab_compare.validate_data(df, "after_table")
