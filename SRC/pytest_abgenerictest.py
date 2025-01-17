@@ -30,7 +30,7 @@ def test_get_schema_from_table(ab_compare):
 
 
 def test_compare_schemas(ab_compare, caplog):
-    """Test the compare_schemas method."""
+    # Mocked data and schema
     data_a = [("value1", "value2")]
     schema_a = ["key_column1", "key_column2"]
     df_a = MockDataFrame(data_a, schema_a)
@@ -41,15 +41,19 @@ def test_compare_schemas(ab_compare, caplog):
     df_b = MockDataFrame(data_b, schema_b)
     df_b.createOrReplaceTempView = MagicMock()
 
+    # Mocking spark.createDataFrame
     ab_compare.spark.createDataFrame = MagicMock(side_effect=[df_a, df_b])
+
+    # Creating temporary views
     ab_compare.spark.createDataFrame(data_a, schema=schema_a).createOrReplaceTempView("before_table")
     ab_compare.spark.createDataFrame(data_b, schema=schema_b).createOrReplaceTempView("after_table")
 
+    # Run the compare_schemas method with logging
     with caplog.at_level(logging.INFO):
         ab_compare.compare_schemas("before_table", "after_table")
 
-    assert "Schemas are identical." in caplog.text
-
+    # Assert the correct log message is present
+    assert "Schemas are identical." in caplog.text, f"Expected log message not found. Logs: {caplog.text}"
 
 if __name__ == "__main__":
     pytest.main()
