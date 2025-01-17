@@ -23,9 +23,9 @@ def test_get_schema_from_table(ab_compare):
     table_name = "test_table"
 
     # Mock the Read.load method
-    with patch('awscli.SRC.ABGenericScript.Read.load', return_value="database.schema"):
+    with patch('awscli.SRC.ABGenericScript.Read.load', return_value=["key_column1", "key_column2"]):
         result = ab_compare.get_schema_from_table(table_name)
-        assert result == "database.schema"
+        assert result == ["key_column1", "key_column2"]
 
 # Test the compare_schemas method
 def test_compare_schemas(ab_compare, caplog):
@@ -55,27 +55,29 @@ def test_validate_data(ab_compare):
     df = MockDataFrame(data, schema)
     df.count = MagicMock(return_value=1)  # Mock count method
 
-    # Assume validate_data returns True if the data is valid
-    result = ab_compare.validate_data(df)
-    assert result is True
+    # Mock get_schema_from_table method
+    with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema):
+        # Assume validate_data returns True if the data is valid
+        result = ab_compare.validate_data(df, "after_table")
+        assert result is True
 
-    # Test invalid data scenarios
-    # Dataframe is None
-    with pytest.raises(ValueError, match="Dataframe cannot be None"):
-        ab_compare.validate_data(None)
+        # Test invalid data scenarios
+        # Dataframe is None
+        with pytest.raises(ValueError, match="Dataframe cannot be None"):
+            ab_compare.validate_data(None, "after_table")
 
-    # Dataframe is empty
-    df_empty = MockDataFrame([], schema)
-    df_empty.count = MagicMock(return_value=0)
-    with pytest.raises(ValueError, match="Dataframe is empty"):
-        ab_compare.validate_data(df_empty)
+        # Dataframe is empty
+        df_empty = MockDataFrame([], schema)
+        df_empty.count = MagicMock(return_value=0)
+        with pytest.raises(ValueError, match="Dataframe is empty"):
+            ab_compare.validate_data(df_empty, "after_table")
 
-    # Dataframe missing columns
-    df_missing_columns = MockDataFrame(data, ["key_column1"])
-    df_missing_columns.count = MagicMock(return_value=1)
-    df_missing_columns.columns = ["key_column1"]
-    with pytest.raises(ValueError, match="Missing expected column: key_column2"):
-        ab_compare.validate_data(df_missing_columns)
+        # Dataframe missing columns
+        df_missing_columns = MockDataFrame(data, ["key_column1"])
+        df_missing_columns.count = MagicMock(return_value=1)
+        df_missing_columns.columns = ["key_column1"]
+        with pytest.raises(ValueError, match="Missing expected column: key_column2"):
+            ab_compare.validate_data(df_missing_columns, "after_table")
 
 if __name__ == "__main__":
     pytest.main()
