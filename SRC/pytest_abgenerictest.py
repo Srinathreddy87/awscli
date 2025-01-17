@@ -54,7 +54,6 @@ def test_validate_data(ab_compare):
     schema = ["key_column1", "key_column2"]
     df = MockDataFrame(data, schema)
     df.count = MagicMock(return_value=1)  # Mock count method
-    df.columns = schema  # Mock columns attribute
 
     # Assume validate_data returns True if the data is valid
     result = ab_compare.validate_data(df)
