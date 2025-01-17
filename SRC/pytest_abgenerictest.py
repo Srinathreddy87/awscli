@@ -20,6 +20,27 @@ def ab_compare_fixture():
 
 
 # Test the validate_data method
+# awscli/SRC/pytest_abgenerictest.py
+
+import pytest
+import pandas as pd
+from unittest.mock import MagicMock, patch
+from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
+from awscli.SRC.mocks.mock_spark import MockSparkSession, MockDataFrame
+
+# Fixture to set up the ABTestDeltaTables instance with mocks
+@pytest.fixture(name="ab_compare")
+def ab_compare_fixture():
+    dbutils_mock = MagicMock()
+    spark_mock = MockSparkSession()
+    config = ABtestconfig(
+        table_a="test_table_a",
+        post_fix="test_post_fix",
+        result_table="test_result_table"
+    )
+    return ABTestDeltaTables(spark_mock, dbutils_mock, config)
+
+# Test the validate_data method
 def test_validate_data(ab_compare):
     data = [("value1", "value2")]
     schema = ["key_column1", "key_column2"]
@@ -64,5 +85,12 @@ def test_validate_data(ab_compare):
         with pytest.raises(ValueError, match="Data in dataframe and after_table are different."):
             ab_compare.validate_data(df, "after_table")
 
+        # Handle FileNotFoundError scenario
+        with patch.object(ab_compare.spark.read, 'table', side_effect=FileNotFoundError("File not found: before_table")):
+            with pytest.raises(FileNotFoundError, match="File not found: before_table"):
+                ab_compare.validate_data(df, "before_table")
+
+if __name__ == "__main__":
+    pytest.main()
 if __name__ == "__main__":
     pytest.main()
