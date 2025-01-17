@@ -114,5 +114,15 @@ def test_validate_data(ab_compare):
             ab_compare.validate_data(df, "after_table")
 
 
+# Test the create_join_condition method
+def test_create_join_condition(ab_compare):
+    df1_columns = ["id", "name_id", 123, "age"]
+    df2_columns = ["id", "name_id", 456, "age"]
+
+    join_condition = ab_compare.create_join_condition(df1_columns, df2_columns)
+    expected_condition = "df1.id = df2.id AND df1.name_id = df2.name_id"
+    assert join_condition == expected_condition
+
+
 if __name__ == "__main__":
     pytest.main()
