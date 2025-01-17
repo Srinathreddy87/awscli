@@ -130,6 +130,11 @@ def print_ascii_values(label, string):
         print(f"Index {i}: '{char}' (ASCII {ord(char)})")
     print()
 
+# Helper function to normalize and compare strings
+def normalize_and_compare(str1, str2):
+    normalized_str1 = " ".join(str1.split())
+    normalized_str2 = " ".join(str2.split())
+    return normalized_str1 == normalized_str2
 
 if __name__ == "__main__":
     pytest.main()
