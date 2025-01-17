@@ -18,38 +18,14 @@ def ab_compare_fixture():
     )
     return ABTestDeltaTables(spark_mock, dbutils_mock, config)
 
-
-# Test the validate_data method
-# awscli/SRC/pytest_abgenerictest.py
-
-import pytest
-import pandas as pd
-from unittest.mock import MagicMock, patch
-from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
-from awscli.SRC.mocks.mock_spark import MockSparkSession, MockDataFrame
-
-# Fixture to set up the ABTestDeltaTables instance with mocks
-@pytest.fixture(name="ab_compare")
-def ab_compare_fixture():
-    dbutils_mock = MagicMock()
-    spark_mock = MockSparkSession()
-    config = ABtestconfig(
-        table_a="test_table_a",
-        post_fix="test_post_fix",
-        result_table="test_result_table"
-    )
-    return ABTestDeltaTables(spark_mock, dbutils_mock, config)
-
 # Test the validate_data method
 def test_validate_data(ab_compare):
-    data = [("value1", "value2")]
     schema = ["key_column1", "key_column2"]
+    data = [("value1", "value2")]
     df = MockDataFrame(pd.DataFrame(data, columns=schema))
     df.count = MagicMock(return_value=1)  # Mock count method
 
-    data_a = [("value1", "value2")]
-    schema_a = ["key_column1", "key_column2"]
-    df_a = MockDataFrame(pd.DataFrame(data_a, columns=schema_a))
+    df_a = MockDataFrame(pd.DataFrame(data, columns=schema))
     df_a.count = MagicMock(return_value=1)  # Mock count method
     df_a.createOrReplaceTempView = MagicMock()
 
@@ -75,7 +51,6 @@ def test_validate_data(ab_compare):
         # Dataframe missing columns
         df_missing_columns = MockDataFrame(pd.DataFrame(data, columns=["key_column1"]))
         df_missing_columns.count = MagicMock(return_value=1)
-        df_missing_columns.columns = ["key_column1"]
         with pytest.raises(ValueError, match="Missing expected column: key_column2"):
             ab_compare.validate_data(df_missing_columns, "after_table")
 
@@ -90,7 +65,5 @@ def test_validate_data(ab_compare):
             with pytest.raises(FileNotFoundError, match="File not found: before_table"):
                 ab_compare.validate_data(df, "before_table")
 
-if __name__ == "__main__":
-    pytest.main()
 if __name__ == "__main__":
     pytest.main()
