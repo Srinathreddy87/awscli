@@ -22,10 +22,11 @@ def ab_compare_fixture():
 def test_get_schema_from_table(ab_compare):
     table_name = "test_table"
 
-    # Mock the Read.load method
-    with patch('awscli.SRC.ABGenericScript.Read.load', return_value=["key_column1", "key_column2"]):
+    # Mock the Read.format method chain
+    with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
+        mock_read_format.return_value.table.return_value = "database.schema"
         result = ab_compare.get_schema_from_table(table_name)
-        assert result == ["key_column1", "key_column2"]
+        assert result == "database.schema"
 
 # Test the compare_schemas method
 def test_compare_schemas(ab_compare, caplog):
@@ -46,8 +47,10 @@ def test_compare_schemas(ab_compare, caplog):
     with caplog.at_level(logging.INFO):
         # Mock the get_schema_from_table method
         with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema_a):
-            result = ab_compare.compare_schemas("before_table", "after_table")
-            assert result is True
+            with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
+                mock_read_format.return_value.table.side_effect = [df_a, df_b]
+                result = ab_compare.compare_schemas("before_table", "after_table")
+                assert result is True
 
         # Test different schemas
         with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', side_effect=[schema_a, ["key_column1"]]):
@@ -56,13 +59,11 @@ def test_compare_schemas(ab_compare, caplog):
 
         # Test different data
         df_b_diff = MockDataFrame([("value3", "value4")], schema_b)
-        ab_compare.spark.createDataFrame = MagicMock(side_effect=[df_a, df_b_diff])
-        ab_compare.spark.createDataFrame(data_a, schema=schema_a).createOrReplaceTempView("before_table")
-        ab_compare.spark.createDataFrame([("value3", "value4")], schema_b).createOrReplaceTempView("after_table")
-        
         with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema_a):
-            with pytest.raises(ValueError, match="Data in tables are different."):
-                ab_compare.compare_schemas("before_table", "after_table")
+            with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
+                mock_read_format.return_value.table.side_effect = [df_a, df_b_diff]
+                with pytest.raises(ValueError, match="Data in tables are different."):
+                    ab_compare.compare_schemas("before_table", "after_table")
 
 # Test the validate_data method
 def test_validate_data(ab_compare):
@@ -78,35 +79,36 @@ def test_validate_data(ab_compare):
     df_a.createOrReplaceTempView = MagicMock()
 
     ab_compare.spark.createDataFrame = MagicMock(return_value=df_a)
-    ab_compare.spark.sql = MagicMock(return_value=df_a)
+    with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
+        mock_read_format.return_value.table.return_value = df_a
 
-    # Assume validate_data returns True if the data is valid
-    result = ab_compare.validate_data(df, "after_table")
-    assert result is True
+        # Assume validate_data returns True if the data is valid
+        result = ab_compare.validate_data(df, "after_table")
+        assert result is True
 
-    # Test invalid data scenarios
-    # Dataframe is None
-    with pytest.raises(ValueError, match="Dataframe cannot be None"):
-        ab_compare.validate_data(None, "after_table")
+        # Test invalid data scenarios
+        # Dataframe is None
+        with pytest.raises(ValueError, match="Dataframe cannot be None"):
+            ab_compare.validate_data(None, "after_table")
 
-    # Dataframe is empty
-    df_empty = MockDataFrame([], schema)
-    df_empty.count = MagicMock(return_value=0)
-    with pytest.raises(ValueError, match="Dataframe is empty"):
-        ab_compare.validate_data(df_empty, "after_table")
+        # Dataframe is empty
+        df_empty = MockDataFrame([], schema)
+        df_empty.count = MagicMock(return_value=0)
+        with pytest.raises(ValueError, match="Dataframe is empty"):
+            ab_compare.validate_data(df_empty, "after_table")
 
-    # Dataframe missing columns
-    df_missing_columns = MockDataFrame(data, ["key_column1"])
-    df_missing_columns.count = MagicMock(return_value=1)
-    df_missing_columns.columns = ["key_column1"]
-    with pytest.raises(ValueError, match="Missing expected column: key_column2"):
-        ab_compare.validate_data(df_missing_columns, "after_table")
+        # Dataframe missing columns
+        df_missing_columns = MockDataFrame(data, ["key_column1"])
+        df_missing_columns.count = MagicMock(return_value=1)
+        df_missing_columns.columns = ["key_column1"]
+        with pytest.raises(ValueError, match="Missing expected column: key_column2"):
+            ab_compare.validate_data(df_missing_columns, "after_table")
 
-    # Dataframe and after_table data are different
-    df_diff = MockDataFrame([("value3", "value4")], schema)
-    ab_compare.spark.sql = MagicMock(return_value=df_diff)
-    with pytest.raises(ValueError, match="Data in dataframe and after_table are different."):
-        ab_compare.validate_data(df, "after_table")
+        # Dataframe and after_table data are different
+        df_diff = MockDataFrame([("value3", "value4")], schema)
+        mock_read_format.return_value.table.return_value = df_diff
+        with pytest.raises(ValueError, match="Data in dataframe and after_table are different."):
+            ab_compare.validate_data(df, "after_table")
 
 if __name__ == "__main__":
     pytest.main()
