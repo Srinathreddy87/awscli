@@ -124,6 +124,12 @@ def test_create_join_condition(ab_compare):
     expected_condition = "df1.id = df2.id AND df1.name_id = df2.name_id AND df1.age = df2.age"
     assert join_condition == expected_condition
 
+def print_ascii_values(label, string):
+    print(f"{label} (length {len(string)}):")
+    for i, char in enumerate(string):
+        print(f"Index {i}: '{char}' (ASCII {ord(char)})")
+    print()
+
 
 if __name__ == "__main__":
     pytest.main()
