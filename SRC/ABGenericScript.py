@@ -153,7 +153,14 @@ class ABTestDeltaTables:
         for col, new_col in renamed_columns.items():
             df = df.withColumnRenamed(col, new_col)
         return df
-
+# New Method
+    def create_join_condition(self, df1, df2):
+        join_conditions = []
+        for col1, col2 in zip(df1.columns, df2.columns):
+            if isinstance(col1, str) and isinstance(col2, str) and col1.endswith('_id') and col2.endswith('_id'):
+                join_conditions.append(f"df1.{col1} = df2.{col2}")
+        return " AND ".join(join_conditions)
+    # Old Method
     def create_join_condition(self, df_a, df_b):
         """
         Create join condition based on all columns.
