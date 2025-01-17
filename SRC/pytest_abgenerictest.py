@@ -1,4 +1,4 @@
----MS
+--ms
 
 import pandas as pd
 
@@ -75,8 +75,7 @@ class MockSparkSession:
         df.createOrReplaceTempView(name)
 
 
----- TP
-
+--TP
 
 import pytest
 import pandas as pd
