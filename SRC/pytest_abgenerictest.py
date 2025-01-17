@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
 from awscli.SRC.mocks.mock_spark import MockSparkSession, MockDataFrame
 
+
 # Fixture to set up the ABTestDeltaTables instance with mocks
 @pytest.fixture(name="ab_compare")
 def ab_compare_fixture():
@@ -18,6 +19,7 @@ def ab_compare_fixture():
     )
     return ABTestDeltaTables(spark_mock, dbutils_mock, config)
 
+
 # Test the get_schema_from_table method
 def test_get_schema_from_table(ab_compare):
     table_name = "test_table"
@@ -28,6 +30,7 @@ def test_get_schema_from_table(ab_compare):
         mock_format.return_value.table.return_value.schema = mock_schema
         result = ab_compare.get_schema_from_table(table_name)
         assert result == mock_schema
+
 
 # Test the compare_schemas method
 def test_compare_schemas(ab_compare, caplog):
@@ -64,6 +67,7 @@ def test_compare_schemas(ab_compare, caplog):
             mock_format.return_value.table.side_effect = [df_a, df_b_diff]
             with pytest.raises(ValueError, match="Data in tables are different."):
                 ab_compare.compare_schemas("before_table", "after_table")
+
 
 # Test the validate_data method
 def test_validate_data(ab_compare):
@@ -109,6 +113,7 @@ def test_validate_data(ab_compare):
         mock_format.return_value.table.return_value = df_diff
         with pytest.raises(ValueError, match="Data in dataframe and after_table are different."):
             ab_compare.validate_data(df, "after_table")
+
 
 if __name__ == "__main__":
     pytest.main()
