@@ -22,11 +22,12 @@ def ab_compare_fixture():
 def test_get_schema_from_table(ab_compare):
     table_name = "test_table"
 
-    # Mock the Read.format method chain
-    with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
-        mock_read_format.return_value.table.return_value = "database.schema"
+    # Mock the spark.read.format().table().schema chain
+    mock_schema = MagicMock()
+    with patch.object(ab_compare.spark.read, 'format', return_value=MagicMock()) as mock_format:
+        mock_format.return_value.table.return_value.schema = mock_schema
         result = ab_compare.get_schema_from_table(table_name)
-        assert result == "database.schema"
+        assert result == mock_schema
 
 # Test the compare_schemas method
 def test_compare_schemas(ab_compare, caplog):
@@ -45,25 +46,24 @@ def test_compare_schemas(ab_compare, caplog):
     ab_compare.spark.createDataFrame(data_b, schema=schema_b).createOrReplaceTempView("after_table")
 
     with caplog.at_level(logging.INFO):
-        # Mock the get_schema_from_table method
-        with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema_a):
-            with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
-                mock_read_format.return_value.table.side_effect = [df_a, df_b]
-                result = ab_compare.compare_schemas("before_table", "after_table")
-                assert result is True
+        # Mock the spark.read.format().table() chain
+        with patch.object(ab_compare.spark.read, 'format', return_value=MagicMock()) as mock_format:
+            mock_format.return_value.table.side_effect = [df_a, df_b]
+            result = ab_compare.compare_schemas("before_table", "after_table")
+            assert result is True
 
         # Test different schemas
-        with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', side_effect=[schema_a, ["key_column1"]]):
+        with patch.object(ab_compare.spark.read, 'format', return_value=MagicMock()) as mock_format:
+            mock_format.return_value.table.side_effect = [df_a, MockDataFrame([], ["key_column1"])]
             with pytest.raises(ValueError, match="Schemas are different."):
                 ab_compare.compare_schemas("before_table", "after_table")
 
         # Test different data
         df_b_diff = MockDataFrame([("value3", "value4")], schema_b)
-        with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema_a):
-            with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
-                mock_read_format.return_value.table.side_effect = [df_a, df_b_diff]
-                with pytest.raises(ValueError, match="Data in tables are different."):
-                    ab_compare.compare_schemas("before_table", "after_table")
+        with patch.object(ab_compare.spark.read, 'format', return_value=MagicMock()) as mock_format:
+            mock_format.return_value.table.side_effect = [df_a, df_b_diff]
+            with pytest.raises(ValueError, match="Data in tables are different."):
+                ab_compare.compare_schemas("before_table", "after_table")
 
 # Test the validate_data method
 def test_validate_data(ab_compare):
@@ -79,8 +79,8 @@ def test_validate_data(ab_compare):
     df_a.createOrReplaceTempView = MagicMock()
 
     ab_compare.spark.createDataFrame = MagicMock(return_value=df_a)
-    with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.spark.read.format', return_value=MagicMock()) as mock_read_format:
-        mock_read_format.return_value.table.return_value = df_a
+    with patch.object(ab_compare.spark.read, 'format', return_value=MagicMock()) as mock_format:
+        mock_format.return_value.table.return_value = df_a
 
         # Assume validate_data returns True if the data is valid
         result = ab_compare.validate_data(df, "after_table")
@@ -106,7 +106,7 @@ def test_validate_data(ab_compare):
 
         # Dataframe and after_table data are different
         df_diff = MockDataFrame([("value3", "value4")], schema)
-        mock_read_format.return_value.table.return_value = df_diff
+        mock_format.return_value.table.return_value = df_diff
         with pytest.raises(ValueError, match="Data in dataframe and after_table are different."):
             ab_compare.validate_data(df, "after_table")
 
