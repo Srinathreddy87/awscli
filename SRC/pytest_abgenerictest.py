@@ -45,15 +45,14 @@ class MockDataFrame:
 
     def _apply_join(self, other, on, how):
         """Mock method for applying join"""
-        join_clause = self._parse_join_clause(on)
-        # Simplified join logic for demonstration purposes
-        join_column = join_clause.split(" = ")[0].split(".")[1]
-        joined_data = pd.merge(self.data, other.data, left_on=join_column, right_on=join_column, how=how)
+        join_column = on.split(" = ")[0].split(".")[1]
+        joined_data = pd.merge(self.data, other.data, on=join_column, how=how)
         return MockDataFrame(joined_data)
 
     def join(self, other, on, how="inner"):
         """Mock method for join"""
         return self._apply_join(other, on, how)
+
 
 class MockRead:
     def format(self, format_type):
@@ -61,6 +60,7 @@ class MockRead:
 
     def table(self, table_name):
         return MockDataFrame(pd.DataFrame([("value1", "value2")], columns=["key_column1", "key_column2"]))
+
 
 class MockSparkSession:
     def __init__(self):
@@ -75,7 +75,7 @@ class MockSparkSession:
         df.createOrReplaceTempView(name)
 
 
---TP
+---TF
 
 import pytest
 import pandas as pd
