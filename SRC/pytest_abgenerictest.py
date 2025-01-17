@@ -2,7 +2,7 @@
 
 import pytest
 import logging
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
 from awscli.SRC.mocks.mock_spark import MockSparkSession, MockDataFrame
 
@@ -44,9 +44,25 @@ def test_compare_schemas(ab_compare, caplog):
     ab_compare.spark.createDataFrame(data_b, schema=schema_b).createOrReplaceTempView("after_table")
 
     with caplog.at_level(logging.INFO):
-        ab_compare.compare_schemas("before_table", "after_table")
+        # Mock the get_schema_from_table method
+        with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema_a):
+            result = ab_compare.compare_schemas("before_table", "after_table")
+            assert result is True
 
-    assert "Schemas are identical." in caplog.text
+        # Test different schemas
+        with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', side_effect=[schema_a, ["key_column1"]]):
+            with pytest.raises(ValueError, match="Schemas are different."):
+                ab_compare.compare_schemas("before_table", "after_table")
+
+        # Test different data
+        df_b_diff = MockDataFrame([("value3", "value4")], schema_b)
+        ab_compare.spark.createDataFrame = MagicMock(side_effect=[df_a, df_b_diff])
+        ab_compare.spark.createDataFrame(data_a, schema=schema_a).createOrReplaceTempView("before_table")
+        ab_compare.spark.createDataFrame([("value3", "value4")], schema_b).createOrReplaceTempView("after_table")
+        
+        with patch('awscli.SRC.ABGenericScript.ABTestDeltaTables.get_schema_from_table', return_value=schema_a):
+            with pytest.raises(ValueError, match="Data in tables are different."):
+                ab_compare.compare_schemas("before_table", "after_table")
 
 # Test the validate_data method
 def test_validate_data(ab_compare):
