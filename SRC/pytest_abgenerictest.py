@@ -1,5 +1,3 @@
-# awscli/SRC/pytest_abgenerictest.py
-
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
