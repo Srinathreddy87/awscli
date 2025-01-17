@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
 from awscli.SRC.mocks.mock_spark import MockSparkSession, MockDataFrame
 
-
 # Fixture to set up the ABTestDeltaTables instance with mocks
 @pytest.fixture(name="ab_compare")
 def ab_compare_fixture():
