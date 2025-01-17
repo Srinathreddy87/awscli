@@ -1,11 +1,4 @@
-    def select(self, *cols):
-        """Mock method for select"""
-        selected_columns = [col.split(".")[1] if "." in col else col for col in cols]
-        selected_data = self.data[selected_columns]
-        return MockDataFrame(selected_data)
-
---------
- import pytest
+import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
 from awscli.SRC.ABGenericScript import ABTestDeltaTables, ABtestconfig
