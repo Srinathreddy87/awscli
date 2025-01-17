@@ -117,14 +117,12 @@ def test_validate_data(ab_compare):
 # Test the create_join_condition method
 def test_create_join_condition(ab_compare):
     # Mock DataFrames with the 'columns' attribute
-    df1 = MockDataFrame([("id", "name_id", 123, "age")], ["id", "name_id", "age"])
-    df2 = MockDataFrame([("id", "name_id", 456, "age")], ["id", "name_id", "age"])
+    df1 = MockDataFrame([], ["id", "name_id", "age"])
+    df2 = MockDataFrame([], ["id", "name_id", "age"])
 
     join_condition = ab_compare.create_join_condition(df1, df2)
-    expected_condition = "df1.id = df2.id AND df1.name_id = df2.name_id"
+    expected_condition = "df1.id = df2.id AND df1.name_id = df2.name_id AND df1.age = df2.age"
     assert join_condition == expected_condition
-if __name__ == "__main__":
-    pytest.main()
 
 
 if __name__ == "__main__":
