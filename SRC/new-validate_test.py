@@ -6,39 +6,52 @@ from sparta import ABTestDeltaTables  # Assuming the class is in sparta.py
 def mock_spark():
     """Fixture to provide a mock SparkSession with simplified mocks."""
     mock_spark = MagicMock()
-    mock_spark.read.format.return_value.table.return_value = MagicMock()
-    mock_spark.read.table.return_value = MagicMock(schema="mock_schema")
+    mock_spark.createDataFrame.return_value = MagicMock()
     return mock_spark
 
 @patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
-def test_get_schema_from_table(mock_spark):
-    """Test the get_schema_from_table method."""
+def test_rename_columns(mock_spark):
+    """Test the rename_columns method."""
     ab_test = ABTestDeltaTables(mock_spark)
+    mock_df = MagicMock(columns=['col1', 'col2'])
+    renamed_df = ab_test.rename_columns(mock_df, "_a")
 
-    # Test with valid table name
-    schema = ab_test.get_schema_from_table("catalog.schema.table")
-    assert schema == "mock_schema"
-    mock_spark.read.table.assert_called_once_with("catalog.schema.sparta_audit_result")
-
-    # Test with invalid table name
-    with pytest.raises(ValueError) as exc_info:
-        ab_test.get_schema_from_table("invalid_table_name")
-    assert str(exc_info.value) == "Table name must be in the format 'catalog.schema.table'"
+    # Assertions
+    assert renamed_df.withColumnRenamed.call_count == len(mock_df.columns)
+    for col in mock_df.columns:
+        renamed_df.withColumnRenamed.assert_any_call(col, f"{col}_a")
 
 @patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
-def test_compare_schemas(mock_spark):
-    """Test the compare_schemas method."""
+def test_create_join_condition(mock_spark):
+    """Test the create_join_condition method."""
     ab_test = ABTestDeltaTables(mock_spark)
+    mock_df1 = MagicMock(columns=['col1', 'col2'])
+    mock_df2 = MagicMock(columns=['col1', 'col2'])
+    join_condition = ab_test.create_join_condition(mock_df1, mock_df2)
 
-    # Test with identical schemas
-    mock_spark.read.format.return_value.table.return_value.schema = {1, 2, 3}
-    ab_test.compare_schemas("before_table", "after_table")
-    # Assert logging message (you'll need to capture logs for this)
+    # Assertions
+    assert join_condition == "df1.col1 = df2.col1 AND df1.col2 = df2.col2"
 
-    # Test with different schemas
-    mock_spark.read.format.return_value.table.side_effect = [
-        MagicMock(schema={1, 2, 3}),
-        MagicMock(schema={1, 2, 4})
-    ]
-    ab_test.compare_schemas("before_table", "after_table")
-    # Assert logging message (you'll need to capture logs for this)
+@patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
+def test_construct_comparison_query(mock_spark):
+    """Test the construct_comparison_query method."""
+    ab_test = ABTestDeltaTables(mock_spark)
+    mock_df_a = MagicMock(columns=['col1_a', 'col2_a'])
+    mock_df_b = MagicMock(columns=['col1_b', 'col2_b'])
+    query = ab_test.construct_comparison_query(mock_df_a, mock_df_b)
+
+    # Assertions
+    expected_query = """
+    SELECT col1_a, col2_a, col1_b, col2_b,
+    CASE WHEN col1_a IS NULL OR col1_b IS NULL THEN 'unmatch'
+         WHEN col1_a = col1_b THEN 'match'
+         ELSE 'unmatch' END AS col1_result,
+    CASE WHEN col2_a IS NULL OR col2_b IS NULL THEN 'unmatch'
+         WHEN col2_a = col2_b THEN 'match'
+         ELSE 'unmatch' END AS col2_result,
+    CASE WHEN col1_result = 'unmatch' OR col2_result = 'unmatch'
+         THEN 'unmatch'
+         ELSE 'match' END AS validation_result
+    FROM joined_view
+    """
+    assert query.strip() == expected_query.strip()
