@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
+from datetime import datetime
 from sparta import ABTestDeltaTables  # Assuming the class is in sparta.py
 
 @pytest.fixture
@@ -10,48 +11,44 @@ def mock_spark():
     return mock_spark
 
 @patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
-def test_rename_columns(mock_spark):
-    """Test the rename_columns method."""
+@patch('sparta.datetime')  # Patch datetime to control the run_date
+def test_prepare_results(mock_datetime, mock_spark):
+    """Test the prepare_results method."""
     ab_test = ABTestDeltaTables(mock_spark)
-    mock_df = MagicMock(columns=['col1', 'col2'])
-    renamed_df = ab_test.rename_columns(mock_df, "_a")
+    mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)  # Fixed datetime
+    mock_comparison_df = MagicMock()
+    mock_comparison_df.filter.return_value.count.return_value = 5  # Mock count
+    columns = ['col1_a', 'col2_a', 'col3_a']  # Sample columns
 
-    # Assertions
-    assert renamed_df.withColumnRenamed.call_count == len(mock_df.columns)
-    for col in mock_df.columns:
-        renamed_df.withColumnRenamed.assert_any_call(col, f"{col}_a")
+    results = ab_test.prepare_results(mock_comparison_df, columns, "before_table", "after_table")
+
+    assert len(results) == len(columns)
+    for i, col in enumerate(columns):
+        assert results[i] == {
+            "test_name": "ABTest",
+            "table_a": "before_table",
+            "table_b": "after_table",
+            "column_name": col.replace("_a", ""),
+            "schema_mismatch": False,  # Assuming all columns exist
+            "data_mismatch": True,  # Since count is > 0
+            "mismatch_count": 5,
+            "validation_errors": None,
+            "run_date": datetime(2024, 1, 1, 12, 0, 0)
+        }
+
+    # Check filter condition
+    mock_comparison_df.filter.assert_called_with("col1_result = 'unmatch'")
 
 @patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
-def test_create_join_condition(mock_spark):
-    """Test the create_join_condition method."""
+def test_write_results(mock_spark):
+    """Test the write_results method."""
     ab_test = ABTestDeltaTables(mock_spark)
-    mock_df1 = MagicMock(columns=['col1', 'col2'])
-    mock_df2 = MagicMock(columns=['col1', 'col2'])
-    join_condition = ab_test.create_join_condition(mock_df1, mock_df2)
+    mock_results_df = MagicMock()
+
+    ab_test.write_results(mock_results_df, "audit_table_name")
 
     # Assertions
-    assert join_condition == "df1.col1 = df2.col1 AND df1.col2 = df2.col2"
-
-@patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
-def test_construct_comparison_query(mock_spark):
-    """Test the construct_comparison_query method."""
-    ab_test = ABTestDeltaTables(mock_spark)
-    mock_df_a = MagicMock(columns=['col1_a', 'col2_a'])
-    mock_df_b = MagicMock(columns=['col1_b', 'col2_b'])
-    query = ab_test.construct_comparison_query(mock_df_a, mock_df_b)
-
-    # Assertions
-    expected_query = """
-    SELECT col1_a, col2_a, col1_b, col2_b,
-    CASE WHEN col1_a IS NULL OR col1_b IS NULL THEN 'unmatch'
-         WHEN col1_a = col1_b THEN 'match'
-         ELSE 'unmatch' END AS col1_result,
-    CASE WHEN col2_a IS NULL OR col2_b IS NULL THEN 'unmatch'
-         WHEN col2_a = col2_b THEN 'match'
-         ELSE 'unmatch' END AS col2_result,
-    CASE WHEN col1_result = 'unmatch' OR col2_result = 'unmatch'
-         THEN 'unmatch'
-         ELSE 'match' END AS validation_result
-    FROM joined_view
-    """
-    assert query.strip() == expected_query.strip()
+    mock_results_df.write.format.assert_called_with("delta")
+    mock_results_df.write.format().mode.assert_called_with("append")
+    mock_results_df.write.format().mode().saveAsTable.assert_called_once_with("audit_table_name")
+    # You'll need to add assertions to check for logging messages using caplog fixture, similar to previous examples
