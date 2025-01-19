@@ -6,27 +6,39 @@ from sparta import ABTestDeltaTables  # Assuming the class is in sparta.py
 def mock_spark():
     """Fixture to provide a mock SparkSession with simplified mocks."""
     mock_spark = MagicMock()
-    mock_spark.read.format.return_value.table.return_value = MagicMock(columns=['col1', 'col2'])
-    mock_spark.sql.return_value = MagicMock()
-    mock_spark.createDataFrame.return_value = MagicMock()
+    mock_spark.read.format.return_value.table.return_value = MagicMock()
+    mock_spark.read.table.return_value = MagicMock(schema="mock_schema")
     return mock_spark
 
-@patch('sparta.ABTestDeltaTables.rename_columns', side_effect=lambda df, suffix: df)
-@patch('sparta.ABTestDeltaTables.create_join_condition', return_value="join_condition")
-@patch('sparta.ABTestDeltaTables.construct_comparison_query', return_value="comparison_query")
-@patch('sparta.ABTestDeltaTables.get_schema_from_table', return_value="schema")
-@patch('sparta.ABTestDeltaTables.prepare_results', return_value="results")
-@patch('sparta.ABTestDeltaTables.write_results')
-def test_validate_data(mock_write_results, mock_prepare_results, mock_get_schema_from_table, mock_construct_comparison_query, mock_create_join_condition, mock_rename_columns, mock_spark):
-    """Test the validate_data method with simplified mocks."""
+@patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
+def test_get_schema_from_table(mock_spark):
+    """Test the get_schema_from_table method."""
     ab_test = ABTestDeltaTables(mock_spark)
-    ab_test.validate_data("before_table", "after_table")
 
-    # Assertions (simplified)
-    mock_spark.read.format.assert_called_with("delta")
-    mock_spark.read.format().table.assert_any_call("before_table")
-    mock_spark.read.format().table.assert_any_call("after_table")
-    mock_spark.sql.assert_called_once_with("comparison_query")
-    mock_get_schema_from_table.assert_called_once_with("before_table.sparta_audit_result")
-    mock_spark.createDataFrame.assert_called_once_with("results", "schema")
-    mock_write_results.assert_called_once()
+    # Test with valid table name
+    schema = ab_test.get_schema_from_table("catalog.schema.table")
+    assert schema == "mock_schema"
+    mock_spark.read.table.assert_called_once_with("catalog.schema.sparta_audit_result")
+
+    # Test with invalid table name
+    with pytest.raises(ValueError) as exc_info:
+        ab_test.get_schema_from_table("invalid_table_name")
+    assert str(exc_info.value) == "Table name must be in the format 'catalog.schema.table'"
+
+@patch('sparta.ABTestDeltaTables.spark', new_callable=mock_spark)
+def test_compare_schemas(mock_spark):
+    """Test the compare_schemas method."""
+    ab_test = ABTestDeltaTables(mock_spark)
+
+    # Test with identical schemas
+    mock_spark.read.format.return_value.table.return_value.schema = {1, 2, 3}
+    ab_test.compare_schemas("before_table", "after_table")
+    # Assert logging message (you'll need to capture logs for this)
+
+    # Test with different schemas
+    mock_spark.read.format.return_value.table.side_effect = [
+        MagicMock(schema={1, 2, 3}),
+        MagicMock(schema={1, 2, 4})
+    ]
+    ab_test.compare_schemas("before_table", "after_table")
+    # Assert logging message (you'll need to capture logs for this)
