@@ -57,4 +57,59 @@
         }
     ]
 }
+-----------
 
+
+-- Load the JSON data into a DataFrame
+CREATE OR REPLACE TEMP VIEW ab_final_result_schema AS
+SELECT * FROM json.`/dbfs/mocks/ab_final_result_schema.json`;
+
+-- Create a summary table to show columns and data mismatches for each table
+WITH ab_test_summary AS (
+    SELECT
+        experiment_id,
+        table_a,
+        table_b,
+        column_name,
+        COUNT(*) AS mismatch_count,
+        SUM(CASE WHEN schema_mismatch THEN 1 ELSE 0 END) AS schema_mismatch_count,
+        SUM(CASE WHEN data_mismatch THEN 1 ELSE 0 END) AS data_mismatch_count
+    FROM
+        ab_final_result_schema
+    GROUP BY
+        experiment_id,
+        table_a,
+        table_b,
+        column_name
+),
+drill_down_queries AS (
+    SELECT
+        experiment_id,
+        table_a,
+        table_b,
+        column_name,
+        CONCAT('SELECT * FROM ', table_a, ' WHERE ', column_name, ' IS NULL OR ', column_name, ' IN (SELECT ', column_name, ' FROM ', table_b, ' WHERE ', column_name, ' IS NULL)') AS drill_down_query
+    FROM
+        ab_final_result_schema
+    WHERE
+        schema_mismatch = TRUE OR data_mismatch = TRUE
+)
+
+-- Main query to use for visualization
+SELECT
+    s.experiment_id,
+    s.table_a,
+    s.table_b,
+    s.column_name,
+    s.mismatch_count,
+    s.schema_mismatch_count,
+    s.data_mismatch_count,
+    d.drill_down_query
+FROM
+    ab_test_summary s
+    LEFT JOIN drill_down_queries d ON s.experiment_id = d.experiment_id AND s.table_a = d.table_a AND s.table_b = d.table_b AND s.column_name = d.column_name
+ORDER BY
+    s.experiment_id,
+    s.table_a,
+    s.table_b,
+    s.column_name;
