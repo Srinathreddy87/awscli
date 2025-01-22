@@ -59,7 +59,6 @@
 }
 -----------
 
-
 -- Load the JSON data into a DataFrame
 CREATE OR REPLACE TEMP VIEW ab_final_result_schema AS
 SELECT * FROM json.`/dbfs/mocks/ab_final_result_schema.json`;
@@ -67,24 +66,25 @@ SELECT * FROM json.`/dbfs/mocks/ab_final_result_schema.json`;
 -- Create a summary table to show columns and data mismatches for each table
 WITH ab_test_summary AS (
     SELECT
-        experiment_id,
+        test_name,
         table_a,
         table_b,
         column_name,
         COUNT(*) AS mismatch_count,
-        SUM(CASE WHEN schema_mismatch THEN 1 ELSE 0 END) AS schema_mismatch_count,
-        SUM(CASE WHEN data_mismatch THEN 1 ELSE 0 END) AS data_mismatch_count
+        SUM(CASE WHEN column_name NOT IN (SELECT column_name FROM json.`/dbfs/mocks/ab_final_result_schema.json`) THEN 1 ELSE 0 END) AS schema_mismatch,
+        SUM(CASE WHEN data_mismatch THEN 1 ELSE 0 END) AS data_mismatch,
+        current_date() AS run_date
     FROM
         ab_final_result_schema
     GROUP BY
-        experiment_id,
+        test_name,
         table_a,
         table_b,
         column_name
 ),
 drill_down_queries AS (
     SELECT
-        experiment_id,
+        test_name,
         table_a,
         table_b,
         column_name,
@@ -97,19 +97,20 @@ drill_down_queries AS (
 
 -- Main query to use for visualization
 SELECT
-    s.experiment_id,
+    s.test_name,
     s.table_a,
     s.table_b,
     s.column_name,
+    s.schema_mismatch > 0 AS schema_mismatch,
+    s.data_mismatch > 0 AS data_mismatch,
     s.mismatch_count,
-    s.schema_mismatch_count,
-    s.data_mismatch_count,
+    s.run_date,
     d.drill_down_query
 FROM
     ab_test_summary s
-    LEFT JOIN drill_down_queries d ON s.experiment_id = d.experiment_id AND s.table_a = d.table_a AND s.table_b = d.table_b AND s.column_name = d.column_name
+    LEFT JOIN drill_down_queries d ON s.test_name = d.test_name AND s.table_a = d.table_a AND s.table_b = d.table_b AND s.column_name = d.column_name
 ORDER BY
-    s.experiment_id,
+    s.test_name,
     s.table_a,
     s.table_b,
     s.column_name;
