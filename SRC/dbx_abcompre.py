@@ -5,6 +5,7 @@ schema comparison and row-by-row data validation.
 """
 
 import logging
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Dict
@@ -264,6 +265,22 @@ class ABTestDeltaTables:
             )
         except Exception as e:
             logger.error("Failed to save full comparison results: %s", e)
+
+def update_audit_table(audit_table_name, data, branch_name):
+    # Add the branch name as a new column to the DataFrame
+    data['story_name'] = branch_name
+    
+    # Example: Save the updated DataFrame to the audit table
+    # This will depend on how you are interacting with your database
+    # For example, using SQLAlchemy:
+    from sqlalchemy import create_engine
+    engine = create_engine('your_database_connection_string')
+    
+    try:
+        data.to_sql(audit_table_name, engine, if_exists='append', index=False)
+        print(f"Data successfully inserted into {audit_table_name}")
+    except Exception as e:
+        print(f"Error inserting data into {audit_table_name}: {str(e)}")
 
 def main():
     if len(sys.argv) != 4:
