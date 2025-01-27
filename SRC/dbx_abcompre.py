@@ -268,18 +268,13 @@ class ABTestDeltaTables:
             logger.error("Failed to save full comparison results: %s", e)
             logger.error(traceback.format_exc())
 
-def update_audit_table(audit_table_name, data, branch_name):
+def update_audit_table(spark, audit_table_name, data, branch_name):
     # Add the branch name as a new column to the DataFrame
-    data['story_name'] = branch_name
-    
-    # Example: Save the updated DataFrame to the audit table
-    # This will depend on how you are interacting with your database
-    # For example, using SQLAlchemy:
-    from sqlalchemy import create_engine
-    engine = create_engine('your_database_connection_string')
+    data = data.withColumn("story_name", F.lit(branch_name))
     
     try:
-        data.to_sql(audit_table_name, engine, if_exists='append', index=False)
+        # Write the updated DataFrame to the audit table
+        data.write.format("delta").mode("append").saveAsTable(audit_table_name)
         print(f"Data successfully inserted into {audit_table_name}")
     except Exception as e:
         print(f"Error inserting data into {audit_table_name}: {str(e)}")
@@ -298,20 +293,16 @@ def main():
         # Read the table from the S3 path
         df = spark.read.option("header", "true").csv(s3_path)
     
-        # Process the table as needed
-        # For example, converting to a Pandas DataFrame for further processing
-        pdf = df.toPandas()
-    
         # Example audit data (replace with actual data processing)
         audit_data = {
             'column1': ['value1', 'value2'],
             'column2': ['value3', 'value4'],
             # Add other columns as needed
         }
-        audit_df = pd.DataFrame(audit_data)
+        audit_df = spark.createDataFrame(audit_data)
     
         # Update the audit table with the sample data and the branch name
-        update_audit_table(audit_table_name, audit_df, branch_name)
+        update_audit_table(spark, audit_table_name, audit_df, branch_name)
     
     except Exception as e:
         print(f"An error occurred: {str(e)}")
