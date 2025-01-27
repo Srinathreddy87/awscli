@@ -8,17 +8,9 @@ import logging
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Dict
-
-from pyspark.sql import SparkSession
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    BooleanType,
-    IntegerType,
-    TimestampType,
-)
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType
 
 # Set up a logger
 logger = logging.getLogger(__name__)
@@ -28,7 +20,6 @@ ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
-
 
 @dataclass
 class ABTestConfig:
@@ -41,7 +32,6 @@ class ABTestConfig:
         result_table (str): Name of the result Delta table to store
                             comparison results.
     """
-
     table_a: str
     post_fix: str
     result_table: str
@@ -51,12 +41,10 @@ class ABTestConfig:
         self.post_fix = post_fix
         self.result_table = result_table
 
-
 class ABTestDeltaTables:
     """
     A class to perform A/B testing on Delta tables in Databricks.
     """
-
     def __init__(self, spark, dbutils, config: ABTestConfig):
         """
         Initialize the A/B test with Delta table names.
@@ -285,24 +273,34 @@ def main():
     audit_table_name = 'table_audit'
     branch_name = "branch"
     s3_path = "s3://path/story.yml"
+    result_table = "result_table"
+    table_a = "catalog.schema.table_a"
+    post_fix = "_b"
 
     # Initialize Spark session
     spark = SparkSession.builder.appName("ABGenericScript").getOrCreate()
 
+    # Initialize dbutils (this is required in Databricks)
+    from pyspark.dbutils import DBUtils
+    dbutils = DBUtils(spark)
+
+    # Create ABTestConfig and ABTestDeltaTables instances
+    config = ABTestConfig(table_a, post_fix, result_table)
+    ab_test = ABTestDeltaTables(spark, dbutils, config)
+
     try:
-        # Read the table from the S3 path
-        df = spark.read.option("header", "true").csv(s3_path)
-    
-        # Example audit data (replace with actual data processing)
-        audit_data = {
-            'column1': ['value1', 'value2'],
-            'column2': ['value3', 'value4'],
-            # Add other columns as needed
-        }
-        audit_df = spark.createDataFrame(audit_data)
-    
-        # Update the audit table with the sample data and the branch name
-        update_audit_table(spark, audit_table_name, audit_df, branch_name)
+        # Perform schema comparison
+        table_b = f"{table_a.split('.')[0]}.{table_a.split('.')[1]}{post_fix}"
+        ab_test.compare_schemas(table_a, table_b)
+
+        # Perform data validation
+        ab_test.validate_data(table_a, table_b)
+
+        # Read the result table
+        result_df = spark.read.format("delta").table(result_table)
+
+        # Update the audit table with the A/B test results and the branch name
+        update_audit_table(spark, audit_table_name, result_df, branch_name)
     
     except Exception as e:
         print(f"An error occurred: {str(e)}")
