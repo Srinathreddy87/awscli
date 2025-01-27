@@ -5,7 +5,6 @@ schema comparison and row-by-row data validation.
 """
 
 import logging
-import sys
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
@@ -287,13 +286,10 @@ def update_audit_table(audit_table_name, data, branch_name):
         print(traceback.format_exc())
 
 def main():
-    if len(sys.argv) != 4:
-        print("Usage: python SRC/ABGenericScript.py <audit_table_name> <branch_name> <s3_path>")
-        sys.exit(1)
-
-    audit_table_name = sys.argv[1]
-    branch_name = sys.argv[2]
-    s3_path = sys.argv[3]
+    # Parameters
+    audit_table_name = 'table_audit'
+    branch_name = "branch"
+    s3_path = "s3://path/story.yml"
 
     # Initialize Spark session
     spark = SparkSession.builder.appName("ABGenericScript").getOrCreate()
