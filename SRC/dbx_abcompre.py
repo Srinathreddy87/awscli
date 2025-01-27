@@ -6,6 +6,7 @@ schema comparison and row-by-row data validation.
 
 import logging
 import sys
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Dict
@@ -250,6 +251,7 @@ class ABTestDeltaTables:
             )
         except Exception as e:
             logger.error("Failed to save comparison results: %s", e)
+            logger.error(traceback.format_exc())
 
     def write_comparison_results(self, comparison_df):
         """
@@ -265,6 +267,7 @@ class ABTestDeltaTables:
             )
         except Exception as e:
             logger.error("Failed to save full comparison results: %s", e)
+            logger.error(traceback.format_exc())
 
 def update_audit_table(audit_table_name, data, branch_name):
     # Add the branch name as a new column to the DataFrame
@@ -281,6 +284,7 @@ def update_audit_table(audit_table_name, data, branch_name):
         print(f"Data successfully inserted into {audit_table_name}")
     except Exception as e:
         print(f"Error inserting data into {audit_table_name}: {str(e)}")
+        print(traceback.format_exc())
 
 def main():
     if len(sys.argv) != 4:
@@ -294,23 +298,28 @@ def main():
     # Initialize Spark session
     spark = SparkSession.builder.appName("ABGenericScript").getOrCreate()
 
-    # Read the table from the S3 path
-    df = spark.read.option("header", "true").csv(s3_path)
-
-    # Process the table as needed
-    # For example, converting to a Pandas DataFrame for further processing
-    pdf = df.toPandas()
-
-    # Example audit data (replace with actual data processing)
-    audit_data = {
-        'column1': ['value1', 'value2'],
-        'column2': ['value3', 'value4'],
-        # Add other columns as needed
-    }
-    audit_df = pd.DataFrame(audit_data)
-
-    # Update the audit table with the sample data and the branch name
-    update_audit_table(audit_table_name, audit_df, branch_name)
+    try:
+        # Read the table from the S3 path
+        df = spark.read.option("header", "true").csv(s3_path)
+    
+        # Process the table as needed
+        # For example, converting to a Pandas DataFrame for further processing
+        pdf = df.toPandas()
+    
+        # Example audit data (replace with actual data processing)
+        audit_data = {
+            'column1': ['value1', 'value2'],
+            'column2': ['value3', 'value4'],
+            # Add other columns as needed
+        }
+        audit_df = pd.DataFrame(audit_data)
+    
+        # Update the audit table with the sample data and the branch name
+        update_audit_table(audit_table_name, audit_df, branch_name)
+    
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        print(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
