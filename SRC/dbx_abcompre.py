@@ -107,9 +107,7 @@ class ABTestDeltaTables:
         comparison_df.show(10)
 
         # Derive the audit table name
-        audit_table_name = (
-            f"{before_table.rsplit('.', 1)[0]}.sparta_audit_result"
-        )
+        audit_table_name = f"{before_table.rsplit('.', 1)[0]}.sparta_audit_result"
 
         # Ensure the audit table exists
         self.ensure_audit_table_exists(audit_table_name, comparison_df.schema)
@@ -202,8 +200,7 @@ class ABTestDeltaTables:
                         "column_name": col.replace("_a", ""),
                         "schema_mismatch": col.replace(
                             "_a", ""
-                        )
-                        not in columns,
+                        ) not in columns,
                         "data_mismatch": mismatch_count > 0,
                         "mismatch_count": mismatch_count,
                         "validation_errors": None,
