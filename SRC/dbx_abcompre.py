@@ -117,7 +117,7 @@ class ABTestDeltaTables:
             comparison_df, df_a.columns, before_table, after_table
         )
 
-        results_df = self.spark.createDataFrame(results, self.get_audit_table_schema())
+        results_df = self.spark.createDataFrame([results], self.get_audit_table_schema())
 
         # Write the comparison results to the audit table
         self.write_results(results_df, audit_table_name)
@@ -185,29 +185,30 @@ class ABTestDeltaTables:
         """
         Prepare data for the audit table.
         """
-        results = []
         run_date = datetime.now()
+        total_mismatches = 0
+        schema_mismatches = False
+
         for col in columns:
             if col.endswith("_a"):
                 mismatch_count = comparison_df.filter(
-                    f"{col.replace('_a', '')}_result = 'unmatch'"
+                    F.col(f"{col.replace('_a', '')}_result") == 'unmatch'
                 ).count()
-                results.append(
-                    {
-                        "test_name": "ABTest",
-                        "table_a": before_table,
-                        "table_b": after_table,
-                        "column_name": col.replace("_a", ""),
-                        "schema_mismatch": col.replace(
-                            "_a", ""
-                        ) not in columns,
-                        "data_mismatch": mismatch_count > 0,
-                        "mismatch_count": mismatch_count,
-                        "validation_errors": None,
-                        "run_date": run_date,
-                    }
-                )
-        return results
+                total_mismatches += mismatch_count
+                if col.replace("_a", "") not in columns:
+                    schema_mismatches = True
+
+        return {
+            "test_name": "ABTest",
+            "table_a": before_table,
+            "table_b": after_table,
+            "column_name": "ALL",  # Indicating this is a summary record for all columns
+            "schema_mismatch": schema_mismatches,
+            "data_mismatch": total_mismatches > 0,
+            "mismatch_count": total_mismatches,
+            "validation_errors": None,
+            "run_date": run_date,
+        }
 
     def get_audit_table_schema(self) -> StructType:
         """
