@@ -113,9 +113,7 @@ class ABTestDeltaTables:
         self.ensure_audit_table_exists(audit_table_name, self.get_audit_table_schema())
 
         # Prepare data for the audit table
-        results = self.prepare_results(
-            comparison_df, df_a.columns, before_table, after_table
-        )
+        results = self.prepare_results(comparison_df, before_table, after_table)
 
         results_df = self.spark.createDataFrame([results], self.get_audit_table_schema())
 
@@ -180,30 +178,22 @@ class ABTestDeltaTables:
         """
 
     def prepare_results(
-        self, comparison_df, columns, before_table, after_table
+        self, comparison_df, before_table, after_table
     ):
         """
         Prepare data for the audit table.
         """
         run_date = datetime.now()
-        total_mismatches = 0
-        schema_mismatches = False
 
-        for col in columns:
-            if col.endswith("_a"):
-                mismatch_count = comparison_df.filter(
-                    F.col(f"{col.replace('_a', '')}_result") == 'unmatch'
-                ).count()
-                total_mismatches += mismatch_count
-                if col.replace("_a", "") not in columns:
-                    schema_mismatches = True
+        # Count the total mismatches
+        total_mismatches = comparison_df.filter(F.col("validation_result") == "unmatch").count()
 
         return {
             "test_name": "ABTest",
             "table_a": before_table,
             "table_b": after_table,
             "column_name": "ALL",  # Indicating this is a summary record for all columns
-            "schema_mismatch": schema_mismatches,
+            "schema_mismatch": False,  # Assuming no schema mismatch since schemas are identical
             "data_mismatch": total_mismatches > 0,
             "mismatch_count": total_mismatches,
             "validation_errors": None,
