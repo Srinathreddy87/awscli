@@ -109,7 +109,7 @@ class ABTestDeltaTables:
         joined_df.createOrReplaceTempView("joined_view")
 
         # Construct the query for comparison result for each column
-        comparison_query = self.construct_comparison_query(df_a)
+        comparison_query = self.construct_comparison_query(df_a, df_b)
 
         comparison_df = self.spark.sql(comparison_query)
 
@@ -152,20 +152,20 @@ class ABTestDeltaTables:
         Create join condition based on all columns.
         """
         return [
-            df_a[f"{col}_a"] == df_b[f"{col}_b"]
+            df_a[col] == df_b[col.replace("_a", "_b")]
             for col in df_a.columns
             if col.endswith("_a")
         ]
 
-    def construct_comparison_query(self, df_a):
+    def construct_comparison_query(self, df_a, df_b):
         """
         Construct the query for comparison result for each column.
         """
         comparison_columns = [
             f"""
             CASE
-                WHEN {col}_a IS NULL OR {col}_b IS NULL THEN 'unmatch'
-                WHEN {col}_a = {col}_b THEN 'match'
+                WHEN {col} IS NULL OR {col.replace('_a', '_b')} IS NULL THEN 'unmatch'
+                WHEN {col} = {col.replace('_a', '_b')} THEN 'match'
                 ELSE 'unmatch'
             END AS {col.replace('_a', '')}_result
             """
@@ -272,7 +272,6 @@ def main():
     # Parameters
     audit_table_name = 'table_audit'
     branch_name = "branch"
-    s3_path = "s3://path/story.yml"
     result_table = "result_table"
     table_a = "catalog.schema.table_a"
     post_fix = "_b"
@@ -290,7 +289,7 @@ def main():
 
     try:
         # Perform schema comparison
-        table_b = f"{table_a.split('.')[0]}.{table_a.split('.')[1]}{post_fix}"
+        table_b = f"{table_a.split('.')[0]}.{table_a.split('.')[1]}.{table_a.split('.')[2]}{post_fix}"
         ab_test.compare_schemas(table_a, table_b)
 
         # Perform data validation
