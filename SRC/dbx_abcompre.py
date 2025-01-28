@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, BooleanType, TimestampType
+from pyspark.sql.types import StructType, StructField, StringType, BooleanType, IntegerType, TimestampType
 
 # Set up a logger
 logger = logging.getLogger(__name__)
@@ -64,18 +64,7 @@ class ABTestDeltaTables:
         :param table_name: Name of the table from which to retrieve the schema.
         :return: The schema as a StructType object.
         """
-        # Extract catalog and schema names and append with "sparta_audit_result"
-        parts = table_name.split(".")
-        if len(parts) != 3:
-            raise ValueError(
-                "Table name must be in the format 'catalog.schema.table'"
-            )
-
-        catalog_name, schema_name, _ = parts
-        audit_table_name = f"{catalog_name}.{schema_name}.sparta_audit_result"
-
-        # Retrieve the schema from the audit table
-        return self.spark.read.table(audit_table_name).schema
+        return self.spark.read.format("delta").table(table_name).schema
 
     def compare_schemas(self, before_table, after_table):
         """
@@ -122,15 +111,15 @@ class ABTestDeltaTables:
             f"{before_table.rsplit('.', 1)[0]}.sparta_audit_result"
         )
 
-        # Get the schema from the audit table
-        ab_final_result_schema = self.get_schema_from_table(audit_table_name)
+        # Ensure the audit table exists
+        self.ensure_audit_table_exists(audit_table_name, comparison_df.schema)
 
         # Prepare data for the audit table
         results = self.prepare_results(
             comparison_df, df_a.columns, before_table, after_table
         )
 
-        results_df = self.spark.createDataFrame(results, ab_final_result_schema)
+        results_df = self.spark.createDataFrame(results, self.get_schema_from_table(audit_table_name))
 
         # Write the comparison results to the audit table
         self.write_results(results_df, audit_table_name)
@@ -256,6 +245,18 @@ class ABTestDeltaTables:
             logger.error("Failed to save full comparison results: %s", e)
             logger.error(traceback.format_exc())
 
+    def ensure_audit_table_exists(self, table_name, schema):
+        """
+        Ensure the audit table exists; if not, create it.
+        """
+        try:
+            self.spark.read.table(table_name)
+        except Exception as e:
+            logger.warning(f"Audit table '{table_name}' not found. Creating a new one.")
+            empty_df = self.spark.createDataFrame([], schema)
+            empty_df.write.format("delta").mode("overwrite").saveAsTable(table_name)
+            logger.info(f"Audit table '{table_name}' created successfully.")
+
 def update_audit_table(spark, audit_table_name, data, branch_name):
     # Add the branch name as a new column to the DataFrame
     data = data.withColumn("story_name", F.lit(branch_name))
@@ -270,7 +271,7 @@ def update_audit_table(spark, audit_table_name, data, branch_name):
 
 def main():
     # Parameters
-    audit_table_name = 'table_audit'
+    audit_table_name = 'catalog.schema.sparta_audit_result'
     branch_name = "branch"
     result_table = "result_table"
     table_a = "catalog.schema.table_a"
