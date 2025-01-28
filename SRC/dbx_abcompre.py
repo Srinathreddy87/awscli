@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, BooleanType, TimestampType
 
 # Set up a logger
 logger = logging.getLogger(__name__)
