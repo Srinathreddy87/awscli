@@ -110,14 +110,14 @@ class ABTestDeltaTables:
         audit_table_name = f"{before_table.rsplit('.', 1)[0]}.sparta_audit_result"
 
         # Ensure the audit table exists
-        self.ensure_audit_table_exists(audit_table_name, comparison_df.schema)
+        self.ensure_audit_table_exists(audit_table_name, self.get_audit_table_schema())
 
         # Prepare data for the audit table
         results = self.prepare_results(
             comparison_df, df_a.columns, before_table, after_table
         )
 
-        results_df = self.spark.createDataFrame(results, self.get_schema_from_table(audit_table_name))
+        results_df = self.spark.createDataFrame(results, self.get_audit_table_schema())
 
         # Write the comparison results to the audit table
         self.write_results(results_df, audit_table_name)
@@ -208,6 +208,22 @@ class ABTestDeltaTables:
                     }
                 )
         return results
+
+    def get_audit_table_schema(self) -> StructType:
+        """
+        Get the schema for the audit table.
+        """
+        return StructType([
+            StructField("test_name", StringType(), True),
+            StructField("table_a", StringType(), True),
+            StructField("table_b", StringType(), True),
+            StructField("column_name", StringType(), True),
+            StructField("schema_mismatch", BooleanType(), True),
+            StructField("data_mismatch", BooleanType(), True),
+            StructField("mismatch_count", IntegerType(), True),
+            StructField("validation_errors", StringType(), True),
+            StructField("run_date", TimestampType(), True),
+        ])
 
     def write_results(self, results_df, audit_table_name):
         """
