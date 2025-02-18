@@ -15,3 +15,14 @@ else
     echo "Failed to copy files to S3" >&2
     exit 1
 fi
+
+
+# Write data to Neo4j as nodes
+climes_df.write.format("org.neo4j.spark.DataSource") \
+    .mode("Overwrite") \
+    .option("url", neo4j_uri) \
+    .option("authentication.basic.username", neo4j_user) \
+    .option("authentication.basic.password", neo4j_password) \
+    .option("labels", ":Clime") \  # Label for the nodes in Neo4j
+    .option("node.keys", "clime_id") \  # Primary key for the nodes
+    .save()
